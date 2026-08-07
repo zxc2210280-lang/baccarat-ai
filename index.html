@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V17.1 SINGLE LIVE">
-  <title>AI PRO V17 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V17.2 SINGLE LIVE">
+  <title>AI PRO V17.2 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17.1 · VERIFIED ROADS</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17.2 · VERIFIED ROADS</div></div>
     </header>
 
     <section class="panel">
@@ -419,60 +419,106 @@ var Recognizer=(function(){
       return {result:(best[1]>=minPixels&&conf>.09)?best[0]:null,confidence:conf,counts:c};
     }
 
-    // Search a family of bead-board calibrations around common portrait baccarat layouts.
-    // The board must be 6 rows, filled top-to-bottom then left-to-right.
+    // V17.2: bead board is the ONLY OCR source.
+    // Search multiple normalized layouts. The first profile is tuned from real inja777
+    // iPhone/Safari screenshots; fallback profiles keep compatibility with older captures.
+    var best=null;
+
+    function evaluateGrid(x0,y0,cellX,cellY,profileName){
+      var radius=Math.max(5,Math.min(cellX,cellY)*.37);
+      var seq=[],cells=[],confSum=0,coverSum=0;
+      var maxCols=Math.min(18,Math.max(4,Math.floor((w-x0)/cellX)));
+      var stopped=false;
+
+      for(var col=0;col<maxCols&&!stopped;col++){
+        for(var row=0;row<6;row++){
+          var x=x0+col*cellX,y=y0+row*cellY;
+          if(x<0||x>=w||y<0||y>=h){stopped=true;break;}
+          var q=patch(x,y,radius);
+
+          // In a bead plate the occupied cells are a contiguous prefix in column-major order.
+          // The first genuinely empty cell is the end of the visible sequence.
+          if(!q.result){
+            stopped=true;
+            break;
+          }
+
+          seq.push(q.result);
+          confSum+=q.confidence;
+          cells.push({x:x,y:y,row:row,col:col,result:q.result,confidence:q.confidence});
+        }
+      }
+
+      if(seq.length<6)return;
+
+      var avg=confSum/seq.length;
+      var cnt={B:0,P:0,T:0};
+      seq.forEach(function(v){cnt[v]++;});
+      var unique=(cnt.B>0?1:0)+(cnt.P>0?1:0)+(cnt.T>0?1:0);
+      var majority=Math.max(cnt.B,cnt.P,cnt.T)/seq.length;
+
+      // Wrong UI regions often become a long single-colour hallucination.
+      // Keep legitimate streaks possible, but strongly penalize implausible whole-board mono reads.
+      var diversityBonus=unique===3?520:unique===2?260:-900;
+      var monoPenalty=(seq.length>=10&&majority>.92)?1800:0;
+
+      // Prefer a plausible visible bead board size and confident colored circles.
+      var lengthScore=Math.min(seq.length,72)*115;
+      var score=lengthScore+avg*1500+diversityBonus-monoPenalty;
+
+      if(!best||score>best.score){
+        best={
+          score:score,seq:seq,cells:cells,canvas:canvas,
+          x0:x0,y0:y0,cell:(cellX+cellY)/2,avg:avg,
+          holes:0,completeness:1,profile:profileName,
+          counts:cnt,majority:majority
+        };
+      }
+    }
+
+    function searchProfile(name,nx,ny,nCellX,nCellY,rangeX,rangeY){
+      var baseX=nx*w,baseY=ny*h,baseCX=nCellX*w,baseCY=nCellY*h;
+      var factors=[.94,.97,1,1.03,1.06];
+      factors.forEach(function(f){
+        var cx=baseCX*f,cy=baseCY*f;
+        for(var ox=-rangeX;ox<=rangeX;ox++){
+          for(var oy=-rangeY;oy<=rangeY;oy++){
+            evaluateGrid(
+              baseX+ox*baseCX*.18,
+              baseY+oy*baseCY*.18,
+              cx,cy,name
+            );
+          }
+        }
+      });
+    }
+
+    // Real inja777 screenshot profile measured from provided iPhone screenshots:
+    // first bead center ≈ 18.9% width / 45.3% height; spacing ≈ 3.1% width / 1.43% height.
+    searchProfile('INJA777', .1887, .4531, .0310, .01432, 4, 4);
+
+    // Nearby variants for browser chrome / screenshot cropping differences.
+    searchProfile('INJA777_ALT_A', .1887, .4470, .0310, .01432, 4, 5);
+    searchProfile('INJA777_ALT_B', .1850, .4600, .0310, .01432, 5, 5);
+
+    // Legacy V17 family as fallback for older screenshots.
     var refW=710,refH=1536;
     var sx=w/refW,sy=h/refH;
-    var baseCell=34*Math.min(sx,sy);
-    var baseX=17*sx,baseY=1074*sy;
-    var best=null;
-    var cellFactors=[.84,.88,.92,.96,1,1.04,1.08,1.12,1.16];
-    var xOffsets=[];for(var xo=-70;xo<=70;xo+=10)xOffsets.push(xo*sx);
-    var yOffsets=[];for(var yo=-150;yo<=150;yo+=10)yOffsets.push(yo*sy);
-
-    cellFactors.forEach(function(cf){
-      var cell=baseCell*cf,radius=Math.max(5,cell*.37);
-      xOffsets.forEach(function(dx){
-        yOffsets.forEach(function(dy){
-          var x0=baseX+dx,y0=baseY+dy,samples=[],confSum=0;
-          var maxCols=Math.min(16,Math.max(8,Math.floor((w-x0)/cell)));
-          for(var col=0;col<maxCols;col++){
-            for(var row=0;row<6;row++){
-              var x=x0+col*cell,y=y0+row*cell;
-              if(x<0||x>=w||y<0||y>=h){samples.push({result:null,confidence:0,x:x,y:y,row:row,col:col});continue;}
-              var q=patch(x,y,radius);
-              samples.push({x:x,y:y,row:row,col:col,result:q.result,confidence:q.confidence});
-            }
-          }
-
-          var lastIdx=-1;
-          for(var i=samples.length-1;i>=0;i--){if(samples[i].result){lastIdx=i;break;}}
-          if(lastIdx<3)return;
-
-          var holes=0,seq=[],cells=[],low=0;
-          for(var j=0;j<=lastIdx;j++){
-            var s=samples[j];cells.push(s);
-            if(!s.result){holes++;continue;}
-            seq.push(s.result);confSum+=s.confidence;
-            if(s.confidence<.18)low++;
-          }
-
-          // Valid bead plate should be contiguous; isolated holes strongly penalized.
-          if(holes>1)return;
-          var avg=seq.length?confSum/seq.length:0;
-          var completeness=(lastIdx+1)?seq.length/(lastIdx+1):0;
-          var score=seq.length*125+avg*1100+completeness*500-holes*900-low*18
-            -Math.abs(dx)/(sx||1)*.35-Math.abs(dy)/(sy||1)*.12-Math.abs(cf-1)*170;
-
-          if(!best||score>best.score){
-            best={score:score,seq:seq,cells:cells,canvas:canvas,x0:x0,y0:y0,cell:cell,avg:avg,holes:holes,completeness:completeness};
-          }
-        });
-      });
+    var oldCell=34*Math.min(sx,sy);
+    var oldX=17*sx,oldY=1074*sy;
+    [0.92,1,1.08].forEach(function(cf){
+      var c=oldCell*cf;
+      for(var dx=-30;dx<=30;dx+=10){
+        for(var dy=-70;dy<=70;dy+=10){
+          evaluateGrid(oldX+dx*sx,oldY+dy*sy,c,c,'LEGACY');
+        }
+      }
     });
 
-    if(!best||best.seq.length<4)throw new Error('找不到可連續讀取的六列珠盤路');
-    if(best.avg<.16||best.completeness<.96)throw new Error('珠盤辨識信心不足，請使用完整且清楚的直式路單截圖');
+    if(!best||best.seq.length<6)throw new Error('找不到可連續讀取的珠盤路');
+    if(best.avg<.12)throw new Error('珠盤辨識信心不足，請使用完整且清楚的路單截圖');
+    if(best.seq.length>=10 && best.majority>.94)
+      throw new Error('辨識結果幾乎全部同色，已阻止錯誤匯入；請重新選擇清楚截圖');
 
     var dbg=document.getElementById('debugCanvas');
     dbg.width=w;dbg.height=h;
@@ -500,7 +546,7 @@ var Recognizer=(function(){
       roadOK:roadOK,
       x0:Math.round(best.x0),y0:Math.round(best.y0),cell:best.cell.toFixed(1),
       bigCount:rd.big.length,eyeCount:rd.eye.length,smallCount:rd.small.length,cockCount:rd.cock.length,
-      source:'BEAD_ONLY'
+      source:'BEAD_ONLY',profile:best.profile
     };
     return last;
   }
@@ -532,7 +578,7 @@ var Recognizer=(function(){
     var s=(r.sequence||'').toUpperCase().match(/[BPT]/g)||[];
     if(!s.length)throw new Error('辨識不到有效珠盤序列');
     $('sequenceInput').value=s.join('');
-    $('recognizeInfo').textContent='辨識 '+s.length+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%｜已自動匯入本鞋';
+    $('recognizeInfo').textContent='辨識 '+s.length+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%｜'+(r.profile||'AUTO')+'｜已自動匯入本鞋';
     if(type)$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識並自動匯入。';
     updateVerification(s,r);
     var old=state.current.join('');
