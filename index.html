@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V17.2 SINGLE LIVE">
-  <title>AI PRO V17.2 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V17.3 SINGLE LIVE">
+  <title>AI PRO V17.3 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17.2 · VERIFIED ROADS</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17.3 · VERIFIED ROADS</div></div>
     </header>
 
     <section class="panel">
@@ -464,7 +464,15 @@ var Recognizer=(function(){
 
       // Prefer a plausible visible bead board size and confident colored circles.
       var lengthScore=Math.min(seq.length,72)*115;
-      var score=lengthScore+avg*1500+diversityBonus-monoPenalty;
+      var profileBonus=(profileName.indexOf('INJA777_REAL')===0)?1400:0;
+
+      // A valid bead plate fills top-to-bottom. All completed columns must have 6 cells;
+      // only the final visible column may be partial.
+      var fullCols=Math.floor(seq.length/6);
+      var partial=seq.length%6;
+      var shapeBonus=(fullCols>=2?350:0)+(partial>=0?120:0);
+
+      var score=lengthScore+avg*1500+diversityBonus-monoPenalty+profileBonus+shapeBonus;
 
       if(!best||score>best.score){
         best={
@@ -493,13 +501,16 @@ var Recognizer=(function(){
       });
     }
 
-    // Real inja777 screenshot profile measured from provided iPhone screenshots:
-    // first bead center ≈ 18.9% width / 45.3% height; spacing ≈ 3.1% width / 1.43% height.
-    searchProfile('INJA777', .1887, .4531, .0310, .01432, 4, 4);
+    // V17.3 corrected inja777 geometry measured from the user's real iPhone screenshots.
+    // Bead board sits at the LOWER-LEFT of the casino screenshot, not the upper-middle.
+    // Approximate first bead center: x≈3.2% width, y≈68.0% height.
+    // Horizontal spacing≈4.5% width, vertical spacing≈2.2% height.
+    searchProfile('INJA777_REAL', .032, .680, .0450, .0220, 5, 5);
 
-    // Nearby variants for browser chrome / screenshot cropping differences.
-    searchProfile('INJA777_ALT_A', .1887, .4470, .0310, .01432, 4, 5);
-    searchProfile('INJA777_ALT_B', .1850, .4600, .0310, .01432, 5, 5);
+    // Safari / address-bar / crop variants.
+    searchProfile('INJA777_REAL_A', .030, .672, .0450, .0220, 5, 6);
+    searchProfile('INJA777_REAL_B', .034, .688, .0450, .0220, 5, 6);
+    searchProfile('INJA777_REAL_C', .028, .680, .0440, .0215, 6, 6);
 
     // Legacy V17 family as fallback for older screenshots.
     var refW=710,refH=1536;
@@ -517,8 +528,10 @@ var Recognizer=(function(){
 
     if(!best||best.seq.length<6)throw new Error('找不到可連續讀取的珠盤路');
     if(best.avg<.12)throw new Error('珠盤辨識信心不足，請使用完整且清楚的路單截圖');
-    if(best.seq.length>=10 && best.majority>.94)
-      throw new Error('辨識結果幾乎全部同色，已阻止錯誤匯入；請重新選擇清楚截圖');
+    if(best.seq.length>=10 && best.majority>.90)
+      throw new Error('辨識結果過度單一，已阻止錯誤匯入；請重新選擇清楚截圖');
+    if(best.seq.length<12)
+      throw new Error('珠盤有效格數太少，已阻止錯誤匯入');
 
     var dbg=document.getElementById('debugCanvas');
     dbg.width=w;dbg.height=h;
@@ -578,7 +591,7 @@ var Recognizer=(function(){
     var s=(r.sequence||'').toUpperCase().match(/[BPT]/g)||[];
     if(!s.length)throw new Error('辨識不到有效珠盤序列');
     $('sequenceInput').value=s.join('');
-    $('recognizeInfo').textContent='辨識 '+s.length+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%｜'+(r.profile||'AUTO')+'｜已自動匯入本鞋';
+    $('recognizeInfo').textContent='辨識 '+s.length+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%｜版型 '+(r.profile||'AUTO')+'｜已自動匯入本鞋';
     if(type)$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識並自動匯入。';
     updateVerification(s,r);
     var old=state.current.join('');
