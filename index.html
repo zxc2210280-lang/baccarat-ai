@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V18 SINGLE LIVE">
-  <title>AI PRO V18 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V19 SINGLE LIVE">
+  <title>AI PRO V19 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V18 · VERIFIED ROADS</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V19 · VERIFIED ROADS</div></div>
     </header>
 
     <section class="panel">
@@ -472,9 +472,19 @@ var Recognizer=(function(){
       .sort(function(a,b){return b.n-a.n;}).slice(0,6)
       .sort(function(a,b){return a.y-b.y;});
 
-    if(rows.length<6)throw new Error('珠盤六列定位失敗');
+    if(rows.length<5)throw new Error('珠盤列定位失敗');
 
-    // Estimate columns by clustering x positions across the six rows.
+    // If only 5 stable rows are detected, estimate the missing 6th row from median spacing.
+    if(rows.length===5){
+      var diffs=[];
+      for(var dri=1;dri<rows.length;dri++)diffs.push(rows[dri].y-rows[dri-1].y);
+      diffs.sort(function(a,b){return a-b;});
+      var med=diffs[Math.floor(diffs.length/2)]||Math.max(6,h*.02);
+      // Prefer appending a bottom row, which is the common partial-final-row miss.
+      rows.push({y:rows[rows.length-1].y+med,n:0,items:[]});
+    }
+
+    // Estimate columns by clustering x positions across the rows.
     var usable=[];
     rows.forEach(function(r){r.items.forEach(function(b){usable.push(b);});});
     usable.sort(function(a,b){return a.x-b.x;});
@@ -506,32 +516,52 @@ var Recognizer=(function(){
     });
 
     // Baccarat bead plate order is column-major: top->bottom, then next column.
-    var seq=[],cells=[],done=false;
-    for(var ci=0;ci<cols.length&&!done;ci++){
+    // V19 tolerates a partial last column and minor misses near the tail.
+    var seq=[],cells=[];
+    var started=false, finished=false;
+    for(var ci=0;ci<cols.length&&!finished;ci++){
+      var colVals=[];
       for(var ri=0;ri<6;ri++){
         var b=grid[ri+','+ci];
-        if(!b){done=true;break;}
-        seq.push(b.result);cells.push({x:b.x,y:b.y,row:ri,col:ci,result:b.result,confidence:b.confidence});
+        if(b)colVals.push({b:b,ri:ri});
       }
+      if(!colVals.length){
+        if(started)finished=true;
+        continue;
+      }
+      started=true;
+
+      // Full columns are ideal. A partial column is accepted only as the final visible column.
+      if(colVals.length<6){
+        colVals.sort(function(a,b){return a.ri-b.ri;});
+        // Require partial cells to begin from the top with no internal holes.
+        var contiguous=true;
+        for(var pi=0;pi<colVals.length;pi++){
+          if(colVals[pi].ri!==pi){contiguous=false;break;}
+        }
+        if(!contiguous){
+          // Ignore a malformed tail column rather than poisoning the whole sequence.
+          finished=true;
+          continue;
+        }
+      }
+
+      colVals.sort(function(a,b){return a.ri-b.ri;});
+      colVals.forEach(function(v){
+        var b=v.b;
+        seq.push(b.result);
+        cells.push({x:b.x,y:b.y,row:v.ri,col:ci,result:b.result,confidence:b.confidence});
+      });
+
+      if(colVals.length<6)finished=true;
     }
 
-    // Recover a partial final column after completed columns.
-    var completed=Math.floor(seq.length/6);
-    var base=completed*6;
-    for(var ri=0;ri<6;ri++){
-      var b=grid[ri+','+completed];
-      if(!b)break;
-      if(seq.length<base+ri+1){
-        seq.push(b.result);cells.push({x:b.x,y:b.y,row:ri,col:completed,result:b.result,confidence:b.confidence});
-      }
-    }
-
-    if(seq.length<12)throw new Error('有效珠盤局數太少，已阻止錯誤匯入');
+    if(seq.length<6)throw new Error('珠盤辨識結果不足 6 局，請重新截圖');
 
     var count={B:0,P:0,T:0};
     seq.forEach(function(v){count[v]++;});
     var major=Math.max(count.B,count.P,count.T)/seq.length;
-    if(major>.88)throw new Error('辨識結果過度單一，已阻止錯誤匯入');
+    if(seq.length>=18 && major>.96)throw new Error('辨識結果幾乎全部同色，請重新截圖');
 
     // Draw debug circles around detected bead centers.
     var debug=document.getElementById('debugCanvas');
@@ -546,10 +576,11 @@ var Recognizer=(function(){
     }
 
     var avg=cells.reduce(function(s,c){return s+c.confidence;},0)/Math.max(1,cells.length);
+    var qualityNote=seq.length<18?'SHORT_OK':'OK';
     last={
       sequence:seq.join(''),count:seq.length,b:count.B,p:count.P,t:count.T,
       confidence:Math.round(avg*100),cells:cells,canvas:canvas,
-      source:'BEAD_CIRCLE_V18',profile:'INJA777_CIRCLE'
+      source:'BEAD_CIRCLE_V19',profile:'INJA777_CIRCLE',quality:qualityNote
     };
     return last;
   }
@@ -594,7 +625,7 @@ var Recognizer=(function(){
     }else{
       render();
     }
-    savePreviewImage();persistSession();toast('辨識完成，已自動更新預測');
+    savePreviewImage();persistSession();toast('V19：辨識完成，已自動匯入並更新路單/預測');
   }
   function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();applyRecognized(r,type);}catch(e){$('recognizeInfo').textContent=e.message;setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}});input.value='';}
   $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();applyRecognized(r,'gallery');}catch(e){setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
