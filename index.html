@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V17 SINGLE LIVE">
+  <meta name="application-name" content="AI PRO V17.1 SINGLE LIVE">
   <title>AI PRO V17 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17 · VERIFIED ROADS</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17.1 · VERIFIED ROADS</div></div>
     </header>
 
     <section class="panel">
@@ -528,9 +528,117 @@ var Recognizer=(function(){
   document.querySelectorAll('[data-result]').forEach(function(btn){btn.onclick=function(){add(btn.getAttribute('data-result'));};});
   $('undoBtn').onclick=function(){if(state.current.length){state.current.pop();state.ledger.pop();save();}};$('newShoeBtn').onclick=function(){state=Store.archive(state,'new-shoe');save();toast('已封存並開新鞋');};$('clearBtn').onclick=function(){if(confirm('確定清除目前鞋？')){state.current=[];state.ledger=[];save();}};
   $('exportBtn').onclick=function(){Store.exportJson(state);};$('exportCsvBtn').onclick=function(){Store.exportCsv(state);};$('importInput').onchange=function(){var f=this.files[0],input=this;if(!f)return;Store.importFile(f,function(err,s){if(err)return toast('備份讀取失敗');state=s;save();toast('備份已還原');});input.value='';};$('resetLearningBtn').onclick=function(){if(confirm('重設模型權重？')){state.learning=Learning.fresh();save();}};
-  function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%。請先核對。';$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識。';updateVerification(r.sequence.split(''),r);toast('辨識完成');}catch(e){$('recognizeInfo').textContent=e.message;setVerify('verifyOcr','辨識失敗','bad');toast('辨識失敗');}});input.value='';}
-  $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%';updateVerification(r.sequence.split(''),r);}catch(e){setVerify('verifyOcr','辨識失敗','bad');toast(e.message);}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
+  function applyRecognized(r,type){
+    var s=(r.sequence||'').toUpperCase().match(/[BPT]/g)||[];
+    if(!s.length)throw new Error('辨識不到有效珠盤序列');
+    $('sequenceInput').value=s.join('');
+    $('recognizeInfo').textContent='辨識 '+s.length+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%｜已自動匯入本鞋';
+    if(type)$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識並自動匯入。';
+    updateVerification(s,r);
+    var old=state.current.join('');
+    var next=s.join('');
+    if(old!==next){
+      if(state.current.length)state=Store.archive(state,'before-ocr-replace');
+      state.current=s.slice();
+      state.ledger=[];
+      save();
+    }else{
+      render();
+    }
+    savePreviewImage();persistSession();toast('辨識完成，已自動更新預測');
+  }
+  function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();applyRecognized(r,type);}catch(e){$('recognizeInfo').textContent=e.message;setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}});input.value='';}
+  $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();applyRecognized(r,'gallery');}catch(e){setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
   function seq(){return($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);}$('replaceBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');if(state.current.length)state=Store.archive(state,'before-replace');state.current=s;state.ledger=[];save();toast('已取代目前鞋');};$('appendBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續序列');};
+  // ===== V17.1 iPhone 實戰持續模式 =====
+  var SESSION_KEY='AI_PRO_V17_1_SESSION';
+  var PREVIEW_KEY='AI_PRO_V17_1_LAST_PREVIEW';
+
+  function persistSession(){
+    try{
+      var payload={
+        current:(state.current||[]).slice(),
+        ledger:(state.ledger||[]).slice(),
+        sequenceInput:$('sequenceInput')?$('sequenceInput').value:'',
+        recognizeInfo:$('recognizeInfo')?$('recognizeInfo').textContent:'',
+        imageStatus:$('imageStatus')?$('imageStatus').textContent:'',
+        ts:Date.now()
+      };
+      localStorage.setItem(SESSION_KEY,JSON.stringify(payload));
+    }catch(e){}
+  }
+
+  function restoreSession(){
+    try{
+      var raw=localStorage.getItem(SESSION_KEY);
+      if(!raw)return;
+      var p=JSON.parse(raw);
+      if(p.current&&Array.isArray(p.current)){
+        state.current=p.current.slice();
+        state.ledger=Array.isArray(p.ledger)?p.ledger.slice():[];
+      }
+      if($('sequenceInput')&&p.sequenceInput)$('sequenceInput').value=p.sequenceInput;
+      if($('recognizeInfo')&&p.recognizeInfo)$('recognizeInfo').textContent=p.recognizeInfo;
+      if($('imageStatus')&&p.imageStatus)$('imageStatus').textContent=p.imageStatus;
+      render();
+    }catch(e){}
+  }
+
+  function savePreviewImage(){
+    try{
+      var img=$('preview');
+      if(!img||!img.src||img.style.display==='none')return;
+      localStorage.setItem(PREVIEW_KEY,img.src);
+    }catch(e){}
+  }
+
+  function restorePreviewImage(){
+    try{
+      var v=localStorage.getItem(PREVIEW_KEY);
+      if(!v)return;
+      var img=$('preview');
+      if(img){
+        img.src=v;
+        img.style.display='block';
+      }
+    }catch(e){}
+  }
+
+  // Save aggressively for iPhone Safari background tab eviction.
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='hidden'){
+      persistSession();
+      savePreviewImage();
+    }else{
+      restoreSession();
+      restorePreviewImage();
+    }
+  });
+  window.addEventListener('pagehide',function(){
+    persistSession();
+    savePreviewImage();
+  });
+  window.addEventListener('beforeunload',function(){
+    persistSession();
+    savePreviewImage();
+  });
+  window.addEventListener('pageshow',function(){
+    restoreSession();
+    restorePreviewImage();
+  });
+
+  // Also save after every app state save.
+  var _origSave=save;
+  save=function(){
+    _origSave();
+    persistSession();
+    savePreviewImage();
+  };
+
+  // Restore immediately on startup.
+  restoreSession();
+  restorePreviewImage();
+
   $('replayBtn').onclick=function(){if(replayTimer){clearInterval(replayTimer);replayTimer=null;var syncData=Roads.data(state.current);
     var tieCount=state.current.filter(function(x){return x==="T";}).length;
     var bpCount=state.current.filter(function(x){return x==="B"||x==="P";}).length;
