@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V17.3 SINGLE LIVE">
-  <title>AI PRO V17.3 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V18 SINGLE LIVE">
+  <title>AI PRO V18 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17.3 · VERIFIED ROADS</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V18 · VERIFIED ROADS</div></div>
     </header>
 
     <section class="panel">
@@ -392,174 +392,164 @@ var Recognizer=(function(){
     if(!image)throw new Error("尚未載入圖片");
     var w=image.naturalWidth,h=image.naturalHeight;
     var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-    var ctx=canvas.getContext('2d',{willReadFrequently:true});
-    ctx.drawImage(image,0,0,w,h);
-    var pix=ctx.getImageData(0,0,w,h).data;
+    var ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,w,h);
+    var img=ctx.getImageData(0,0,w,h),d=img.data;
 
-    function patch(x,y,radius){
-      var c={B:0,P:0,T:0},weighted={B:0,P:0,T:0},total=0;
-      var x1=Math.max(0,Math.floor(x-radius)),x2=Math.min(w-1,Math.ceil(x+radius));
-      var y1=Math.max(0,Math.floor(y-radius)),y2=Math.min(h-1,Math.ceil(y+radius));
-      var step=Math.max(1,Math.round(Math.min(w,h)/900));
-      for(var yy=y1;yy<=y2;yy+=step){
-        for(var xx=x1;xx<=x2;xx+=step){
-          var dx=xx-x,dy=yy-y;
-          if(dx*dx+dy*dy>radius*radius)continue;
-          var i=(yy*w+xx)*4,q=colorScore(pix[i],pix[i+1],pix[i+2]);total++;
-          if(q){c[q.v]++;weighted[q.v]+=q.s;}
-        }
-      }
-      var arr=['B','P','T'].map(function(k){return [k,c[k],weighted[k]];})
-        .sort(function(a,b){return (b[1]*100+b[2]/100)-(a[1]*100+a[2]/100);});
-      var best=arr[0],second=arr[1];
-      var coverage=total?best[1]/total:0;
-      var margin=best[1]?(best[1]-second[1])/best[1]:0;
-      var conf=Math.max(0,Math.min(1,coverage*3.2))*Math.max(.20,margin);
-      var minPixels=Math.max(5,total*.07);
-      return {result:(best[1]>=minPixels&&conf>.09)?best[0]:null,confidence:conf,counts:c};
+    function classify(r,g,b){
+      var mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx-mn;
+      if(mx<65||sat<38)return null;
+      if(r>125 && r>g*1.16 && r>b*1.12)return 'B';
+      if(b>108 && b>r*1.08 && b>=g*.90)return 'P';
+      if(g>95 && g>r*1.08 && g>b*.96)return 'T';
+      return null;
+    }
+    function pidx(x,y){return y*w+x;}
+    function cAt(x,y){
+      if(x<0||y<0||x>=w||y>=h)return null;
+      var k=(y*w+x)*4;
+      return classify(d[k],d[k+1],d[k+2]);
     }
 
-    // V17.2: bead board is the ONLY OCR source.
-    // Search multiple normalized layouts. The first profile is tuned from real inja777
-    // iPhone/Safari screenshots; fallback profiles keep compatibility with older captures.
-    var best=null;
+    // Search the lower-left casino panel only. This avoids chips/cards/buttons.
+    var xMin=0,xMax=Math.floor(w*.52);
+    var yMin=Math.floor(h*.58),yMax=Math.floor(h*.89);
+    var step=Math.max(2,Math.round(Math.min(w,h)/420));
+    var seen=new Uint8Array(w*h),blobs=[];
 
-    function evaluateGrid(x0,y0,cellX,cellY,profileName){
-      var radius=Math.max(5,Math.min(cellX,cellY)*.37);
-      var seq=[],cells=[],confSum=0,coverSum=0;
-      var maxCols=Math.min(18,Math.max(4,Math.floor((w-x0)/cellX)));
-      var stopped=false;
+    for(var y=yMin;y<yMax;y+=step){
+      for(var x=xMin;x<xMax;x+=step){
+        var ii=pidx(x,y);
+        if(seen[ii]||!cAt(x,y))continue;
 
-      for(var col=0;col<maxCols&&!stopped;col++){
-        for(var row=0;row<6;row++){
-          var x=x0+col*cellX,y=y0+row*cellY;
-          if(x<0||x>=w||y<0||y>=h){stopped=true;break;}
-          var q=patch(x,y,radius);
+        var q=[[x,y]],qh=0,count=0,sx=0,sy=0,minx=x,maxx=x,miny=y,maxy=y;
+        var ccnt={B:0,P:0,T:0};
 
-          // In a bead plate the occupied cells are a contiguous prefix in column-major order.
-          // The first genuinely empty cell is the end of the visible sequence.
-          if(!q.result){
-            stopped=true;
-            break;
-          }
+        while(qh<q.length && count<9000){
+          var p=q[qh++],px=p[0],py=p[1];
+          if(px<xMin||px>=xMax||py<yMin||py>=yMax)continue;
+          var pi=pidx(px,py);
+          if(seen[pi])continue;
+          seen[pi]=1;
+          var c=cAt(px,py);
+          if(!c)continue;
 
-          seq.push(q.result);
-          confSum+=q.confidence;
-          cells.push({x:x,y:y,row:row,col:col,result:q.result,confidence:q.confidence});
+          count++;sx+=px;sy+=py;ccnt[c]++;
+          if(px<minx)minx=px;if(px>maxx)maxx=px;if(py<miny)miny=py;if(py>maxy)maxy=py;
+          q.push([px+step,py],[px-step,py],[px,py+step],[px,py-step]);
         }
-      }
 
-      if(seq.length<6)return;
+        if(count<5)continue;
+        var bw=maxx-minx+step,bh=maxy-miny+step,aspect=bw/bh;
+        var minD=Math.min(w,h)*.010,maxD=Math.min(w,h)*.055;
+        if(aspect<.52||aspect>1.90||bw<minD||bh<minD||bw>maxD||bh>maxD)continue;
 
-      var avg=confSum/seq.length;
-      var cnt={B:0,P:0,T:0};
-      seq.forEach(function(v){cnt[v]++;});
-      var unique=(cnt.B>0?1:0)+(cnt.P>0?1:0)+(cnt.T>0?1:0);
-      var majority=Math.max(cnt.B,cnt.P,cnt.T)/seq.length;
+        var res='B';
+        if(ccnt.P>ccnt[res])res='P';
+        if(ccnt.T>ccnt[res])res='T';
+        var conf=ccnt[res]/Math.max(1,count);
 
-      // Wrong UI regions often become a long single-colour hallucination.
-      // Keep legitimate streaks possible, but strongly penalize implausible whole-board mono reads.
-      var diversityBonus=unique===3?520:unique===2?260:-900;
-      var monoPenalty=(seq.length>=10&&majority>.92)?1800:0;
-
-      // Prefer a plausible visible bead board size and confident colored circles.
-      var lengthScore=Math.min(seq.length,72)*115;
-      var profileBonus=(profileName.indexOf('INJA777_REAL')===0)?1400:0;
-
-      // A valid bead plate fills top-to-bottom. All completed columns must have 6 cells;
-      // only the final visible column may be partial.
-      var fullCols=Math.floor(seq.length/6);
-      var partial=seq.length%6;
-      var shapeBonus=(fullCols>=2?350:0)+(partial>=0?120:0);
-
-      var score=lengthScore+avg*1500+diversityBonus-monoPenalty+profileBonus+shapeBonus;
-
-      if(!best||score>best.score){
-        best={
-          score:score,seq:seq,cells:cells,canvas:canvas,
-          x0:x0,y0:y0,cell:(cellX+cellY)/2,avg:avg,
-          holes:0,completeness:1,profile:profileName,
-          counts:cnt,majority:majority
-        };
+        blobs.push({x:sx/count,y:sy/count,w:bw,h:bh,result:res,confidence:conf});
       }
     }
 
-    function searchProfile(name,nx,ny,nCellX,nCellY,rangeX,rangeY){
-      var baseX=nx*w,baseY=ny*h,baseCX=nCellX*w,baseCY=nCellY*h;
-      var factors=[.94,.97,1,1.03,1.06];
-      factors.forEach(function(f){
-        var cx=baseCX*f,cy=baseCY*f;
-        for(var ox=-rangeX;ox<=rangeX;ox++){
-          for(var oy=-rangeY;oy<=rangeY;oy++){
-            evaluateGrid(
-              baseX+ox*baseCX*.18,
-              baseY+oy*baseCY*.18,
-              cx,cy,name
-            );
-          }
-        }
+    if(blobs.length<10)throw new Error('找不到足夠珠盤圓點，請使用完整清楚截圖');
+
+    // Find the six horizontal bead rows by clustering y positions.
+    blobs.sort(function(a,b){return a.y-b.y;});
+    var yTol=Math.max(5,h*.0105),clusters=[];
+    blobs.forEach(function(b){
+      var best=-1,bd=1e9;
+      for(var i=0;i<clusters.length;i++){
+        var dd=Math.abs(clusters[i].y-b.y);
+        if(dd<bd){bd=dd;best=i;}
+      }
+      if(best>=0&&bd<yTol){
+        var c=clusters[best];c.y=(c.y*c.n+b.y)/(c.n+1);c.n++;c.items.push(b);
+      }else clusters.push({y:b.y,n:1,items:[b]});
+    });
+
+    var rows=clusters.filter(function(c){return c.n>=2;})
+      .sort(function(a,b){return b.n-a.n;}).slice(0,6)
+      .sort(function(a,b){return a.y-b.y;});
+
+    if(rows.length<6)throw new Error('珠盤六列定位失敗');
+
+    // Estimate columns by clustering x positions across the six rows.
+    var usable=[];
+    rows.forEach(function(r){r.items.forEach(function(b){usable.push(b);});});
+    usable.sort(function(a,b){return a.x-b.x;});
+    var xTol=Math.max(6,w*.014),cols=[];
+    usable.forEach(function(b){
+      var best=-1,bd=1e9;
+      for(var i=0;i<cols.length;i++){
+        var dd=Math.abs(cols[i].x-b.x);
+        if(dd<bd){bd=dd;best=i;}
+      }
+      if(best>=0&&bd<xTol){
+        var c=cols[best];c.x=(c.x*c.n+b.x)/(c.n+1);c.n++;
+      }else cols.push({x:b.x,n:1});
+    });
+    cols=cols.filter(function(c){return c.n>=2;}).sort(function(a,b){return a.x-b.x;});
+    if(cols.length<2)throw new Error('珠盤欄定位失敗');
+
+    // Snap blobs into row/column cells.
+    var grid={};
+    usable.forEach(function(b){
+      var ri=0,rd=1e9;
+      rows.forEach(function(r,i){var dd=Math.abs(r.y-b.y);if(dd<rd){rd=dd;ri=i;}});
+      var ci=0,cd=1e9;
+      cols.forEach(function(c,i){var dd=Math.abs(c.x-b.x);if(dd<cd){cd=dd;ci=i;}});
+      if(rd<yTol*1.5&&cd<xTol*1.6){
+        var key=ri+','+ci;
+        if(!grid[key]||b.confidence>grid[key].confidence)grid[key]=b;
+      }
+    });
+
+    // Baccarat bead plate order is column-major: top->bottom, then next column.
+    var seq=[],cells=[],done=false;
+    for(var ci=0;ci<cols.length&&!done;ci++){
+      for(var ri=0;ri<6;ri++){
+        var b=grid[ri+','+ci];
+        if(!b){done=true;break;}
+        seq.push(b.result);cells.push({x:b.x,y:b.y,row:ri,col:ci,result:b.result,confidence:b.confidence});
+      }
+    }
+
+    // Recover a partial final column after completed columns.
+    var completed=Math.floor(seq.length/6);
+    var base=completed*6;
+    for(var ri=0;ri<6;ri++){
+      var b=grid[ri+','+completed];
+      if(!b)break;
+      if(seq.length<base+ri+1){
+        seq.push(b.result);cells.push({x:b.x,y:b.y,row:ri,col:completed,result:b.result,confidence:b.confidence});
+      }
+    }
+
+    if(seq.length<12)throw new Error('有效珠盤局數太少，已阻止錯誤匯入');
+
+    var count={B:0,P:0,T:0};
+    seq.forEach(function(v){count[v]++;});
+    var major=Math.max(count.B,count.P,count.T)/seq.length;
+    if(major>.88)throw new Error('辨識結果過度單一，已阻止錯誤匯入');
+
+    // Draw debug circles around detected bead centers.
+    var debug=document.getElementById('debugCanvas');
+    if(debug){
+      debug.width=w;debug.height=h;
+      var g=debug.getContext('2d');g.drawImage(image,0,0,w,h);
+      g.lineWidth=Math.max(2,w*.003);
+      cells.forEach(function(c){
+        g.strokeStyle=c.result==='B'?'#f04455':c.result==='P'?'#3a7cf0':'#20c063';
+        g.beginPath();g.arc(c.x,c.y,Math.max(6,w*.012),0,Math.PI*2);g.stroke();
       });
     }
 
-    // V17.3 corrected inja777 geometry measured from the user's real iPhone screenshots.
-    // Bead board sits at the LOWER-LEFT of the casino screenshot, not the upper-middle.
-    // Approximate first bead center: x≈3.2% width, y≈68.0% height.
-    // Horizontal spacing≈4.5% width, vertical spacing≈2.2% height.
-    searchProfile('INJA777_REAL', .032, .680, .0450, .0220, 5, 5);
-
-    // Safari / address-bar / crop variants.
-    searchProfile('INJA777_REAL_A', .030, .672, .0450, .0220, 5, 6);
-    searchProfile('INJA777_REAL_B', .034, .688, .0450, .0220, 5, 6);
-    searchProfile('INJA777_REAL_C', .028, .680, .0440, .0215, 6, 6);
-
-    // Legacy V17 family as fallback for older screenshots.
-    var refW=710,refH=1536;
-    var sx=w/refW,sy=h/refH;
-    var oldCell=34*Math.min(sx,sy);
-    var oldX=17*sx,oldY=1074*sy;
-    [0.92,1,1.08].forEach(function(cf){
-      var c=oldCell*cf;
-      for(var dx=-30;dx<=30;dx+=10){
-        for(var dy=-70;dy<=70;dy+=10){
-          evaluateGrid(oldX+dx*sx,oldY+dy*sy,c,c,'LEGACY');
-        }
-      }
-    });
-
-    if(!best||best.seq.length<6)throw new Error('找不到可連續讀取的珠盤路');
-    if(best.avg<.12)throw new Error('珠盤辨識信心不足，請使用完整且清楚的路單截圖');
-    if(best.seq.length>=10 && best.majority>.90)
-      throw new Error('辨識結果過度單一，已阻止錯誤匯入；請重新選擇清楚截圖');
-    if(best.seq.length<12)
-      throw new Error('珠盤有效格數太少，已阻止錯誤匯入');
-
-    var dbg=document.getElementById('debugCanvas');
-    dbg.width=w;dbg.height=h;
-    var d=dbg.getContext('2d');
-    d.drawImage(image,0,0,w,h);
-    d.lineWidth=Math.max(2,w/355);
-    best.cells.forEach(function(c){
-      d.strokeStyle=c.result==='B'?'#f04455':c.result==='P'?'#347cf0':c.result==='T'?'#20be63':'#ffd166';
-      d.strokeRect(c.x-best.cell/2,c.y-best.cell/2,best.cell,best.cell);
-    });
-
-    var b=0,p=0,t=0;
-    best.seq.forEach(function(x){if(x==='B')b++;else if(x==='P')p++;else t++;});
-
-    // Single source of truth: bead sequence -> Big Road -> all three derived roads.
-    var rd=Roads.data(best.seq);
-    var v=Roads.validate(best.seq);
-    var bp=b+p;
-    var roadOK=rd.big.length===bp && v.big && v.eye && v.small && v.cock;
-
+    var avg=cells.reduce(function(s,c){return s+c.confidence;},0)/Math.max(1,cells.length);
     last={
-      sequence:best.seq.join(''),
-      count:best.seq.length,b:b,p:p,t:t,
-      confidence:Math.round(best.avg*100),
-      roadOK:roadOK,
-      x0:Math.round(best.x0),y0:Math.round(best.y0),cell:best.cell.toFixed(1),
-      bigCount:rd.big.length,eyeCount:rd.eye.length,smallCount:rd.small.length,cockCount:rd.cock.length,
-      source:'BEAD_ONLY',profile:best.profile
+      sequence:seq.join(''),count:seq.length,b:count.B,p:count.P,t:count.T,
+      confidence:Math.round(avg*100),cells:cells,canvas:canvas,
+      source:'BEAD_CIRCLE_V18',profile:'INJA777_CIRCLE'
     };
     return last;
   }
