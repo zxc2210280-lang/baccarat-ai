@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V21.1 SINGLE LIVE">
-  <title>AI PRO V21.1 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V22 SINGLE LIVE">
+  <title>AI PRO V22 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -41,10 +41,10 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
   <main class="wrap">
     <header class="hero">
       <div>
-        <h1>AI PRO V17 SINGLE LIVE</h1>
+        <h1>AI PRO V22 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V21.1 · V21 BEAD VERIFIED</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V22 · V22 AUTO GRID OCR</div></div>
     </header>
 
     <section class="panel">
@@ -390,10 +390,13 @@ var Recognizer=(function(){
 
   function recognize(){
     if(!image)throw new Error("尚未載入圖片");
+
     var w=image.naturalWidth,h=image.naturalHeight;
-    var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-    var ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,w,h);
-    var img=ctx.getImageData(0,0,w,h),d=img.data;
+    var canvas=document.createElement('canvas');
+    canvas.width=w;canvas.height=h;
+    var ctx=canvas.getContext('2d');
+    ctx.drawImage(image,0,0,w,h);
+    var im=ctx.getImageData(0,0,w,h),d=im.data;
 
     function rgbAt(x,y){
       x=Math.max(0,Math.min(w-1,Math.round(x)));
@@ -402,66 +405,190 @@ var Recognizer=(function(){
       return [d[k],d[k+1],d[k+2]];
     }
 
-    function classify(r,g,b){
+    function classifyRGB(r,g,b){
       var mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx-mn;
-      if(mx<60||sat<28)return null;
+      if(mx<55||sat<26)return null;
 
-      // inja777 filled beads:
-      // banker = saturated red, player = cyan/blue, tie = green.
-      if(r>110 && r>g*1.10 && r>b*1.07)return 'B';
-      if(b>95 && b>r*1.04 && b>=g*.86)return 'P';
-      if(g>85 && g>r*1.04 && g>b*.90)return 'T';
+      // inja777 filled bead colors.
+      if(r>105 && r>g*1.08 && r>b*1.06)return 'B';
+      if(b>92 && b>r*1.03 && b>=g*.84)return 'P';
+      if(g>82 && g>r*1.03 && g>b*.88)return 'T';
       return null;
     }
 
-    // Sample an ANNULUS instead of the center. The center contains white Chinese text,
-    // which was the main reason earlier versions misclassified beads.
-    function voteAnnulus(cx,cy,dx,dy){
-      var cnt={B:0,P:0,T:0},samples=0,colored=0;
-      var base=Math.min(dx,dy)*.34;
-      var rings=[.55,.78,1.00];
-      for(var rr=0;rr<rings.length;rr++){
-        var rad=base*rings[rr];
-        for(var k=0;k<16;k++){
-          var a=Math.PI*2*k/16;
-          var rgb=rgbAt(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad);
-          var c=classify(rgb[0],rgb[1],rgb[2]);
-          samples++;
-          if(c){cnt[c]++;colored++;}
-        }
-      }
-      var result='B';
-      if(cnt.P>cnt[result])result='P';
-      if(cnt.T>cnt[result])result='T';
-      var best=cnt[result];
-      if(best<6 || colored<8)return {result:null,confidence:0,colored:colored/samples};
-      return {result:result,confidence:best/samples,colored:colored/samples,counts:cnt};
+    // Build a coarse color mask in the lower-left half of the screenshot.
+    // This finds the bead plate without trusting a fixed x/y profile.
+    var sx0=0, sx1=Math.floor(w*.56);
+    var sy0=Math.floor(h*.52), sy1=Math.floor(h*.93);
+    var step=Math.max(2,Math.round(Math.min(w,h)/420));
+
+    function key(x,y){return y*w+x;}
+    var seen=new Uint8Array(w*h), blobs=[];
+
+    function colorAt(x,y){
+      if(x<0||y<0||x>=w||y>=h)return null;
+      var rgb=rgbAt(x,y);
+      return classifyRGB(rgb[0],rgb[1],rgb[2]);
     }
 
-    // Profiles measured from the user's real inja777 iPhone screenshots.
-    // The bead plate begins around x=3.4%, y=69.8% of the casino screenshot.
-    var profiles=[
-      {name:'INJA_REAL_1',x:.034,y:.698,dx:.0460,dy:.0218},
-      {name:'INJA_REAL_2',x:.034,y:.704,dx:.0460,dy:.0218},
-      {name:'INJA_REAL_3',x:.031,y:.694,dx:.0455,dy:.0219},
-      {name:'INJA_REAL_4',x:.038,y:.700,dx:.0455,dy:.0217}
-    ];
+    // Connected components of saturated red/blue/green.
+    for(var y=sy0;y<sy1;y+=step){
+      for(var x=sx0;x<sx1;x+=step){
+        var ki=key(x,y);
+        if(seen[ki]||!colorAt(x,y))continue;
+
+        var q=[[x,y]],qh=0,count=0,sumx=0,sumy=0,minx=x,maxx=x,miny=y,maxy=y;
+        var cc={B:0,P:0,T:0};
+
+        while(qh<q.length && count<10000){
+          var p=q[qh++],px=p[0],py=p[1];
+          if(px<sx0||px>=sx1||py<sy0||py>=sy1)continue;
+          var pi=key(px,py);
+          if(seen[pi])continue;
+          seen[pi]=1;
+
+          var c=colorAt(px,py);
+          if(!c)continue;
+
+          count++;sumx+=px;sumy+=py;cc[c]++;
+          if(px<minx)minx=px;if(px>maxx)maxx=px;
+          if(py<miny)miny=py;if(py>maxy)maxy=py;
+
+          q.push([px+step,py],[px-step,py],[px,py+step],[px,py-step]);
+        }
+
+        if(count<5)continue;
+        var bw=maxx-minx+step,bh=maxy-miny+step,aspect=bw/bh;
+        var md=Math.min(w,h);
+
+        // Beads are compact, roughly circular filled components.
+        if(aspect<.48||aspect>2.05)continue;
+        if(bw<md*.007||bh<md*.007)continue;
+        if(bw>md*.065||bh>md*.065)continue;
+
+        var res='B';
+        if(cc.P>cc[res])res='P';
+        if(cc.T>cc[res])res='T';
+
+        blobs.push({
+          x:sumx/count,y:sumy/count,w:bw,h:bh,
+          result:res,confidence:cc[res]/Math.max(1,count)
+        });
+      }
+    }
+
+    if(blobs.length<10)throw new Error('找不到足夠珠盤圓點');
+
+    // Find candidate row lattices from y clustering.
+    var yTol=Math.max(5,h*.010);
+    var yClusters=[];
+    blobs.slice().sort(function(a,b){return a.y-b.y;}).forEach(function(b){
+      var best=-1,bd=1e9;
+      for(var i=0;i<yClusters.length;i++){
+        var dd=Math.abs(yClusters[i].y-b.y);
+        if(dd<bd){bd=dd;best=i;}
+      }
+      if(best>=0&&bd<yTol){
+        var r=yClusters[best];
+        r.y=(r.y*r.n+b.y)/(r.n+1);r.n++;r.items.push(b);
+      }else{
+        yClusters.push({y:b.y,n:1,items:[b]});
+      }
+    });
+
+    // Candidate six-row groups: consecutive row centers with near-uniform spacing.
+    yClusters=yClusters.filter(function(r){return r.n>=2;})
+      .sort(function(a,b){return a.y-b.y;});
+
+    var rowGroups=[];
+    for(var i=0;i+4<yClusters.length;i++){
+      for(var len=5;len<=6;len++){
+        if(i+len>yClusters.length)continue;
+        var grp=yClusters.slice(i,i+len);
+        var ds=[];
+        for(var j=1;j<grp.length;j++)ds.push(grp[j].y-grp[j-1].y);
+        var avg=ds.reduce(function(s,v){return s+v;},0)/ds.length;
+        var dev=ds.reduce(function(s,v){return s+Math.abs(v-avg);},0)/ds.length;
+        if(avg>h*.008 && avg<h*.040 && dev<avg*.38){
+          rowGroups.push({rows:grp,avg:avg,dev:dev});
+        }
+      }
+    }
+    if(!rowGroups.length)throw new Error('珠盤六列定位失敗');
 
     var best=null;
 
-    function evalGrid(p,x0,y0,dx,dy){
-      var seq=[],cells=[],conf=0,holes=0;
-      var maxCols=Math.min(18,Math.max(2,Math.floor((w-x0)/dx)));
-      var started=false,ended=false;
-
-      for(var c=0;c<maxCols&&!ended;c++){
-        var vals=[];
-        for(var r=0;r<6;r++){
-          vals.push(voteAnnulus(x0+c*dx,y0+r*dy,dx,dy));
+    function annulusVote(cx,cy,rx,ry){
+      var cnt={B:0,P:0,T:0},samples=0;
+      var radii=[.50,.72,.92];
+      for(var ri=0;ri<radii.length;ri++){
+        var rad=Math.min(rx,ry)*radii[ri];
+        for(var k=0;k<20;k++){
+          var a=Math.PI*2*k/20;
+          var rgb=rgbAt(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad);
+          var c=classifyRGB(rgb[0],rgb[1],rgb[2]);
+          samples++;
+          if(c)cnt[c]++;
         }
+      }
+      var res='B';
+      if(cnt.P>cnt[res])res='P';
+      if(cnt.T>cnt[res])res='T';
+      var votes=cnt[res];
+      if(votes<8)return {result:null,confidence:0};
+      return {result:res,confidence:votes/samples};
+    }
 
-        var prefix=0;
-        while(prefix<6 && vals[prefix].result)prefix++;
+    rowGroups.forEach(function(group){
+      var rows=group.rows.slice();
+
+      // If only 5 detected rows, extrapolate the sixth at the bottom.
+      if(rows.length===5){
+        rows=rows.concat([{y:rows[4].y+group.avg,n:0,items:[]}]);
+      }
+
+      // Gather x coordinates from blobs close to these rows.
+      var rowYs=rows.map(function(r){return r.y;});
+      var usable=blobs.filter(function(b){
+        var md=1e9;
+        rowYs.forEach(function(y){md=Math.min(md,Math.abs(y-b.y));});
+        return md<yTol*1.7;
+      });
+      if(usable.length<10)return;
+
+      // Cluster x positions into columns.
+      var xTol=Math.max(6,w*.014);
+      var cols=[];
+      usable.slice().sort(function(a,b){return a.x-b.x;}).forEach(function(b){
+        var bi=-1,bd=1e9;
+        for(var ci=0;ci<cols.length;ci++){
+          var dd=Math.abs(cols[ci].x-b.x);
+          if(dd<bd){bd=dd;bi=ci;}
+        }
+        if(bi>=0&&bd<xTol){
+          var c=cols[bi];
+          c.x=(c.x*c.n+b.x)/(c.n+1);c.n++;
+        }else cols.push({x:b.x,n:1});
+      });
+
+      cols=cols.filter(function(c){return c.n>=2;})
+        .sort(function(a,b){return a.x-b.x;});
+      if(cols.length<2)return;
+
+      var dxs=[];
+      for(var ci=1;ci<cols.length;ci++)dxs.push(cols[ci].x-cols[ci-1].x);
+      var dx=dxs.length?dxs.sort(function(a,b){return a-b;})[Math.floor(dxs.length/2)]:w*.045;
+      var dy=group.avg;
+
+      // Re-sample the inferred lattice using annulus voting, independent from blob labels.
+      var seq=[],cells=[],holes=0,conf=0,started=false,ended=false;
+      for(var ci=0;ci<cols.length&&!ended;ci++){
+        var prefix=0,vals=[];
+        for(var ri=0;ri<6;ri++){
+          var q=annulusVote(cols[ci].x,rows[ri].y,dx*.42,dy*.42);
+          vals.push(q);
+          if(ri===prefix && q.result)prefix++;
+        }
 
         if(prefix===0){
           if(started)ended=true;
@@ -469,62 +596,39 @@ var Recognizer=(function(){
         }
         started=true;
 
-        // An internal hole is suspicious; only the final column may be partial.
-        for(var rr=prefix;rr<6;rr++)if(vals[rr].result)holes++;
+        for(var ri=prefix;ri<6;ri++)if(vals[ri].result)holes++;
 
-        for(var rr=0;rr<prefix;rr++){
-          var q=vals[rr];
-          seq.push(q.result);
-          conf+=q.confidence;
-          cells.push({x:x0+c*dx,y:y0+rr*dy,row:rr,col:c,result:q.result,confidence:q.confidence});
+        for(var ri=0;ri<prefix;ri++){
+          var q=vals[ri];
+          seq.push(q.result);conf+=q.confidence;
+          cells.push({x:cols[ci].x,y:rows[ri].y,row:ri,col:ci,result:q.result,confidence:q.confidence});
         }
         if(prefix<6)ended=true;
       }
 
       if(seq.length<6)return;
-
-      var cnt={B:0,P:0,T:0};
-      seq.forEach(function(v){cnt[v]++;});
+      var cnt={B:0,P:0,T:0};seq.forEach(function(v){cnt[v]++;});
       var majority=Math.max(cnt.B,cnt.P,cnt.T)/seq.length;
       var unique=(cnt.B?1:0)+(cnt.P?1:0)+(cnt.T?1:0);
       var avg=conf/seq.length;
 
-      // Score for real bead-board behavior: long contiguous prefix, no holes,
-      // multiple colors, and strong annulus agreement.
-      var score=seq.length*180 + avg*2200 - holes*900;
-      if(unique>=2)score+=600;
+      var score=seq.length*200 + avg*2400 - holes*850 - group.dev*20;
+      if(unique>=2)score+=550;
       if(unique===3)score+=350;
       if(seq.length>=18)score+=700;
-      if(majority>.95)score-=3000;
+      if(majority>.96)score-=3200;
 
       if(!best||score>best.score){
         best={score:score,seq:seq,cells:cells,counts:cnt,avg:avg,holes:holes,
-              profile:p.name,x0:x0,y0:y0,dx:dx,dy:dy,majority:majority};
+          majority:majority,profile:'AUTO_GRID_V22',dx:dx,dy:dy};
       }
-    }
-
-    profiles.forEach(function(p){
-      var bx=p.x*w,by=p.y*h,bdx=p.dx*w,bdy=p.dy*h;
-      [0.97,1.00,1.03].forEach(function(sf){
-        for(var ox=-5;ox<=5;ox++){
-          for(var oy=-6;oy<=6;oy++){
-            evalGrid(
-              p,
-              bx+ox*bdx*.10,
-              by+oy*bdy*.10,
-              bdx*sf,bdy*sf
-            );
-          }
-        }
-      });
     });
 
-    if(!best)throw new Error('找不到珠盤區域');
+    if(!best)throw new Error('珠盤自動網格辨識失敗');
     if(best.seq.length<6)throw new Error('珠盤辨識不足 6 局');
     if(best.seq.length>=18 && best.majority>.97)
-      throw new Error('珠盤結果幾乎全部同色，請重新選擇完整截圖');
+      throw new Error('珠盤結果幾乎全部同色');
 
-    // Draw exactly where V21 thinks each bead is. This gives a visible audit trail.
     var debug=document.getElementById('debugCanvas');
     if(debug){
       debug.width=w;debug.height=h;
@@ -542,8 +646,8 @@ var Recognizer=(function(){
       b:best.counts.B,p:best.counts.P,t:best.counts.T,
       confidence:Math.max(1,Math.min(99,Math.round(best.avg*100))),
       cells:best.cells,canvas:canvas,
-      source:'BEAD_V21_1',profile:best.profile,
-      holes:best.holes,x0:best.x0,y0:best.y0,cell:best.dx,
+      source:'BEAD_V22',profile:best.profile,
+      holes:best.holes,cell:best.dx,
       quality:best.holes===0?'OK':'CHECK'
     };
     return last;
