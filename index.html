@@ -25,7 +25,9 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
 
 .buildBadge{margin-top:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px;text-align:center;background:#091729}
 
-  </style>
+  
+.verifyGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.verifyBox{background:#0a1728;border:1px solid var(--line);border-radius:14px;padding:12px}.verifyBox b{display:block;font-size:18px;margin-top:4px}.ok{color:var(--green)}.warn{color:#ffd166}.bad{color:var(--red)}@media(max-width:560px){.verifyGrid{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
   <main class="wrap">
@@ -34,7 +36,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17 · SINGLE FILE</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17 · VERIFIED ROADS</div></div>
     </header>
 
     <section class="panel">
@@ -62,6 +64,19 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <button id="appendBtn">接續目前鞋</button>
       </div>
       <p class="muted" id="recognizeInfo">尚未載入圖片。辨識後請先核對局數再匯入。</p>
+    </section>
+
+    <section class="panel">
+      <h2>五路辨識校驗</h2>
+      <div class="verifyGrid">
+        <div class="verifyBox"><span class="muted">珠盤辨識信心</span><b id="verifyOcr">等待圖片</b></div>
+        <div class="verifyBox"><span class="muted">珠盤 ↔ 大路</span><b id="verifyBig">等待資料</b></div>
+        <div class="verifyBox"><span class="muted">大眼仔規則</span><b id="verifyEye">等待資料</b></div>
+        <div class="verifyBox"><span class="muted">小路規則</span><b id="verifySmall">等待資料</b></div>
+        <div class="verifyBox"><span class="muted">曱甴路規則</span><b id="verifyCock">等待資料</b></div>
+        <div class="verifyBox"><span class="muted">座標校準</span><b id="verifyGrid">等待圖片</b></div>
+      </div>
+      <p class="muted" id="verifyInfo">辨識流程：先找珠盤路 → 重建大路 → 依標準衍生路規則重新計算三路。下三路紅／藍代表規律／不規律，不代表莊／閒。</p>
     </section>
 
     <section class="panel">
@@ -218,7 +233,9 @@ var Roads=(function(){
         var h1=heights[c.col-1]||0,h2=heights[c.col-1-offset]||0;
         red=h1===h2;
       }else{
-        red=!!occ[c.row+','+(c.col-offset)];
+        var sameRow=!!occ[c.row+','+(c.col-offset)];
+        var upperRow=!!occ[(c.row-1)+','+(c.col-offset)];
+        red=(sameRow===upperRow);
       }
       signals.push(red?'B':'P');
     });
@@ -263,7 +280,26 @@ var Roads=(function(){
     });
   }
   function render(seq){var d=data(seq);draw('beadRoad',d.bead,true);draw('bigRoad',d.big,false);draw('eyeRoad',d.eye,true);draw('smallRoad',d.small,true);draw('cockRoad',d.cock,true);}
-  return{data:data,render:render,big:big};
+  function referenceSignals(bigCells,offset){
+    // Independent reference implementation used only for self-check.
+    var occ={},h={};bigCells.forEach(function(c){occ[c.row+','+c.col]=1;h[c.col]=Math.max(h[c.col]||0,c.row+1);});
+    var out=[];bigCells.forEach(function(c){
+      if(c.row===0){
+        if(c.col<offset+1)return;
+        out.push((h[c.col-1]||0)===(h[c.col-1-offset]||0)?'B':'P');
+      }else{
+        if(c.col<offset)return;
+        var a=!!occ[c.row+','+(c.col-offset)],u=!!occ[(c.row-1)+','+(c.col-offset)];
+        out.push(a===u?'B':'P');
+      }
+    });return out;
+  }
+  function validate(seq){
+    var b=big(seq),bp=seq.filter(function(x){return x==='B'||x==='P';}).length;
+    function same(a,b){return a.length===b.length&&a.every(function(x,i){return x===b[i];});}
+    return{big:b.length===bp,eye:same(derivedSignals(b,1),referenceSignals(b,1)),small:same(derivedSignals(b,2),referenceSignals(b,2)),cock:same(derivedSignals(b,3),referenceSignals(b,3))};
+  }
+  return{data:data,render:render,big:big,validate:validate};
 })();
 
 
@@ -276,53 +312,176 @@ var AI=(function(){
 
 
 var Recognizer=(function(){
-  var image=null;
+  var image=null,last=null;
   function load(file,cb){
-    var r=new FileReader();r.onload=function(){var img=new Image();img.onload=function(){image=img;cb(null,img);};img.onerror=function(){cb(new Error("image"));};img.src=r.result;};r.onerror=function(){cb(new Error("read"));};r.readAsDataURL(file);
+    var r=new FileReader();
+    r.onload=function(){
+      var img=new Image();
+      img.onload=function(){image=img;last=null;cb(null,img);};
+      img.onerror=function(){cb(new Error("image"));};
+      img.src=r.result;
+    };
+    r.onerror=function(){cb(new Error("read"));};
+    r.readAsDataURL(file);
   }
-  function classify(r,g,b){
-    var max=Math.max(r,g,b),min=Math.min(r,g,b);if(max-min<35)return null;
-    if(r>150&&r>g*1.18&&r>b*1.08)return"B";
-    if(b>135&&b>r*1.06&&b>g*1.02)return"P";
-    if(g>95&&g>r*1.02&&g>b*.72)return"T";
-    return null;
+
+  // Adaptive baccarat road colour classifier.
+  // Public baccarat road conventions: Banker=red, Player=blue, Tie=green.
+  // Uses normalized dominance + saturation so brightness/theme changes have less effect.
+  function colorScore(r,g,b){
+    var max=Math.max(r,g,b),min=Math.min(r,g,b),range=max-min;
+    if(max<62||range<28)return null;
+    var sum=r+g+b+1, rn=r/sum,gn=g/sum,bn=b/sum;
+    var v=null,strength=0;
+
+    // red / banker
+    if((r>118 && rn>.405 && r-g>28 && r-b>20) || (rn>.46 && r>95)){
+      v='B'; strength=(r-g)+(r-b)+range;
+    }
+    // blue / player
+    if((b>108 && bn>.38 && b-r>18 && b-g>-3) || (bn>.43 && b>90)){
+      var s=(b-r)+Math.max(0,b-g)+range;
+      if(!v||s>strength){v='P';strength=s;}
+    }
+    // green / tie
+    if((g>82 && gn>.37 && g-r>8 && g-b>3) || (gn>.43 && g>72)){
+      var s2=(g-r)+(g-b)+range;
+      if(!v||s2>strength){v='T';strength=s2;}
+    }
+    return v?{v:v,s:strength}:null;
   }
+
   function recognize(){
     if(!image)throw new Error("尚未載入圖片");
-    var w=image.naturalWidth,h=image.naturalHeight,canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
-    var ctx=canvas.getContext("2d");ctx.drawImage(image,0,0,w,h);var data=ctx.getImageData(0,0,w,h).data;
-    var sx=w/710,sy=h/1536,cell=34*sx,x0=17*sx,expected=1074*sy,radius=Math.max(7,12*Math.min(sx,sy)),best=null;
-    function patch(x,y){
-      var counts={B:0,P:0,T:0},x1=Math.max(0,Math.floor(x-radius)),x2=Math.min(w-1,Math.ceil(x+radius)),y1=Math.max(0,Math.floor(y-radius)),y2=Math.min(h-1,Math.ceil(y+radius));
-      for(var yy=y1;yy<=y2;yy+=2)for(var xx=x1;xx<=x2;xx+=2){var i=(yy*w+xx)*4,c=classify(data[i],data[i+1],data[i+2]);if(c)counts[c]++;}
-      var arr=[["B",counts.B],["P",counts.P],["T",counts.T]].sort(function(a,b){return b[1]-a[1];});
-      return arr[0][1]>=18?arr[0][0]:null;
-    }
-    for(var dy=-80*sy;dy<=80*sy;dy+=4*sy){
-      var cells=[],seq=[],stop=false,y0=expected+dy;
-      for(var col=0;col<7&&!stop;col++)for(var row=0;row<6;row++){
-        var x=x0+col*cell,y=y0+row*cell,res=patch(x,y);cells.push({x:x,y:y,result:res,row:row,col:col});
-        if(res)seq.push(res);else{stop=true;break;}
-      }
-      var score=seq.length*100-Math.abs(dy)*.03;if(!best||score>best.score)best={score:score,seq:seq,cells:cells,canvas:canvas,y0:y0,cell:cell};
-    }
-    if(!best||best.seq.length<4)throw new Error("未找到 inja777 珠盤路");
-    var dbg=document.getElementById("debugCanvas");dbg.width=w;dbg.height=h;var d=dbg.getContext("2d");d.drawImage(image,0,0,w,h);d.lineWidth=Math.max(2,w/355);
-    best.cells.forEach(function(c){d.strokeStyle=c.result==="B"?"#f04455":c.result==="P"?"#347cf0":c.result==="T"?"#20be63":"#ffd166";d.strokeRect(c.x-best.cell/2,c.y-best.cell/2,best.cell,best.cell);});
-    var b=0,p=0,t=0;best.seq.forEach(function(x){if(x==="B")b++;else if(x==="P")p++;else t++;});
-    return{sequence:best.seq.join(""),count:best.seq.length,b:b,p:p,t:t};
-  }
-  return{load:load,recognize:recognize};
-})();
+    var w=image.naturalWidth,h=image.naturalHeight;
+    var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    var ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(image,0,0,w,h);
+    var pix=ctx.getImageData(0,0,w,h).data;
 
+    function patch(x,y,radius){
+      var c={B:0,P:0,T:0},weighted={B:0,P:0,T:0},total=0;
+      var x1=Math.max(0,Math.floor(x-radius)),x2=Math.min(w-1,Math.ceil(x+radius));
+      var y1=Math.max(0,Math.floor(y-radius)),y2=Math.min(h-1,Math.ceil(y+radius));
+      var step=Math.max(1,Math.round(Math.min(w,h)/900));
+      for(var yy=y1;yy<=y2;yy+=step){
+        for(var xx=x1;xx<=x2;xx+=step){
+          var dx=xx-x,dy=yy-y;
+          if(dx*dx+dy*dy>radius*radius)continue;
+          var i=(yy*w+xx)*4,q=colorScore(pix[i],pix[i+1],pix[i+2]);total++;
+          if(q){c[q.v]++;weighted[q.v]+=q.s;}
+        }
+      }
+      var arr=['B','P','T'].map(function(k){return [k,c[k],weighted[k]];})
+        .sort(function(a,b){return (b[1]*100+b[2]/100)-(a[1]*100+a[2]/100);});
+      var best=arr[0],second=arr[1];
+      var coverage=total?best[1]/total:0;
+      var margin=best[1]?(best[1]-second[1])/best[1]:0;
+      var conf=Math.max(0,Math.min(1,coverage*3.2))*Math.max(.20,margin);
+      var minPixels=Math.max(5,total*.07);
+      return {result:(best[1]>=minPixels&&conf>.09)?best[0]:null,confidence:conf,counts:c};
+    }
+
+    // Search a family of bead-board calibrations around common portrait baccarat layouts.
+    // The board must be 6 rows, filled top-to-bottom then left-to-right.
+    var refW=710,refH=1536;
+    var sx=w/refW,sy=h/refH;
+    var baseCell=34*Math.min(sx,sy);
+    var baseX=17*sx,baseY=1074*sy;
+    var best=null;
+    var cellFactors=[.84,.88,.92,.96,1,1.04,1.08,1.12,1.16];
+    var xOffsets=[];for(var xo=-70;xo<=70;xo+=10)xOffsets.push(xo*sx);
+    var yOffsets=[];for(var yo=-150;yo<=150;yo+=10)yOffsets.push(yo*sy);
+
+    cellFactors.forEach(function(cf){
+      var cell=baseCell*cf,radius=Math.max(5,cell*.37);
+      xOffsets.forEach(function(dx){
+        yOffsets.forEach(function(dy){
+          var x0=baseX+dx,y0=baseY+dy,samples=[],confSum=0;
+          var maxCols=Math.min(16,Math.max(8,Math.floor((w-x0)/cell)));
+          for(var col=0;col<maxCols;col++){
+            for(var row=0;row<6;row++){
+              var x=x0+col*cell,y=y0+row*cell;
+              if(x<0||x>=w||y<0||y>=h){samples.push({result:null,confidence:0,x:x,y:y,row:row,col:col});continue;}
+              var q=patch(x,y,radius);
+              samples.push({x:x,y:y,row:row,col:col,result:q.result,confidence:q.confidence});
+            }
+          }
+
+          var lastIdx=-1;
+          for(var i=samples.length-1;i>=0;i--){if(samples[i].result){lastIdx=i;break;}}
+          if(lastIdx<3)return;
+
+          var holes=0,seq=[],cells=[],low=0;
+          for(var j=0;j<=lastIdx;j++){
+            var s=samples[j];cells.push(s);
+            if(!s.result){holes++;continue;}
+            seq.push(s.result);confSum+=s.confidence;
+            if(s.confidence<.18)low++;
+          }
+
+          // Valid bead plate should be contiguous; isolated holes strongly penalized.
+          if(holes>1)return;
+          var avg=seq.length?confSum/seq.length:0;
+          var completeness=(lastIdx+1)?seq.length/(lastIdx+1):0;
+          var score=seq.length*125+avg*1100+completeness*500-holes*900-low*18
+            -Math.abs(dx)/(sx||1)*.35-Math.abs(dy)/(sy||1)*.12-Math.abs(cf-1)*170;
+
+          if(!best||score>best.score){
+            best={score:score,seq:seq,cells:cells,canvas:canvas,x0:x0,y0:y0,cell:cell,avg:avg,holes:holes,completeness:completeness};
+          }
+        });
+      });
+    });
+
+    if(!best||best.seq.length<4)throw new Error('找不到可連續讀取的六列珠盤路');
+    if(best.avg<.16||best.completeness<.96)throw new Error('珠盤辨識信心不足，請使用完整且清楚的直式路單截圖');
+
+    var dbg=document.getElementById('debugCanvas');
+    dbg.width=w;dbg.height=h;
+    var d=dbg.getContext('2d');
+    d.drawImage(image,0,0,w,h);
+    d.lineWidth=Math.max(2,w/355);
+    best.cells.forEach(function(c){
+      d.strokeStyle=c.result==='B'?'#f04455':c.result==='P'?'#347cf0':c.result==='T'?'#20be63':'#ffd166';
+      d.strokeRect(c.x-best.cell/2,c.y-best.cell/2,best.cell,best.cell);
+    });
+
+    var b=0,p=0,t=0;
+    best.seq.forEach(function(x){if(x==='B')b++;else if(x==='P')p++;else t++;});
+
+    // Single source of truth: bead sequence -> Big Road -> all three derived roads.
+    var rd=Roads.data(best.seq);
+    var v=Roads.validate(best.seq);
+    var bp=b+p;
+    var roadOK=rd.big.length===bp && v.big && v.eye && v.small && v.cock;
+
+    last={
+      sequence:best.seq.join(''),
+      count:best.seq.length,b:b,p:p,t:t,
+      confidence:Math.round(best.avg*100),
+      roadOK:roadOK,
+      x0:Math.round(best.x0),y0:Math.round(best.y0),cell:best.cell.toFixed(1),
+      bigCount:rd.big.length,eyeCount:rd.eye.length,smallCount:rd.small.length,cockCount:rd.cock.length,
+      source:'BEAD_ONLY'
+    };
+    return last;
+  }
+
+  function getLast(){return last;}
+  return{load:load,recognize:recognize,getLast:getLast};
+})();
 (function(){
   function $(id){return document.getElementById(id);}function toast(msg){var e=$('toast');e.textContent=msg;e.className='toast show';clearTimeout(toast.t);toast.t=setTimeout(function(){e.className='toast';},1700);}var state=Store.load(),replayTimer=null;
+  function setVerify(id,text,kind){var e=$(id);if(!e)return;e.textContent=text;e.className=kind||'';}
+  function updateVerification(seqData,ocr){var v=Roads.validate(seqData||[]);setVerify('verifyBig',v.big?'通過':'異常',v.big?'ok':'bad');setVerify('verifyEye',v.eye?'標準規則通過':'規則異常',v.eye?'ok':'bad');setVerify('verifySmall',v.small?'標準規則通過':'規則異常',v.small?'ok':'bad');setVerify('verifyCock',v.cock?'標準規則通過':'規則異常',v.cock?'ok':'bad');if(ocr){setVerify('verifyOcr',ocr.confidence+'%',ocr.confidence>=55?'ok':ocr.confidence>=35?'warn':'bad');setVerify('verifyGrid','x '+ocr.x0+' / y '+ocr.y0+' / 格 '+ocr.cell,'ok');$('verifyInfo').textContent='辨識 '+ocr.count+' 局；珠盤重建大路 '+(ocr.roadOK?'一致':'不一致')+'。匯入前仍建議核對總局數。';}}
+
   function save(){Store.save(state);render();}function analyze(){return AI.analyze(state.current,state.learning,state.ledger);}function add(actual){var before=analyze();state.current.push(actual);state.ledger.push({at:new Date().toISOString(),actual:actual,call:before.call,confidence:before.confidence,banker:before.banker.toFixed(1),player:before.player.toFixed(1),factors:before.factors});if(actual==='B'||actual==='P')state.learning=Learning.update(state.learning,before.factors,actual,before.call);save();}
   document.querySelectorAll('[data-result]').forEach(function(btn){btn.onclick=function(){add(btn.getAttribute('data-result'));};});
   $('undoBtn').onclick=function(){if(state.current.length){state.current.pop();state.ledger.pop();save();}};$('newShoeBtn').onclick=function(){state=Store.archive(state,'new-shoe');save();toast('已封存並開新鞋');};$('clearBtn').onclick=function(){if(confirm('確定清除目前鞋？')){state.current=[];state.ledger=[];save();}};
   $('exportBtn').onclick=function(){Store.exportJson(state);};$('exportCsvBtn').onclick=function(){Store.exportCsv(state);};$('importInput').onchange=function(){var f=this.files[0],input=this;if(!f)return;Store.importFile(f,function(err,s){if(err)return toast('備份讀取失敗');state=s;save();toast('備份已還原');});input.value='';};$('resetLearningBtn').onclick=function(){if(confirm('重設模型權重？')){state.learning=Learning.fresh();save();}};
-  function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'。請先核對。';$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識。';toast('辨識完成');}catch(e){$('recognizeInfo').textContent=e.message;toast('辨識失敗');}});input.value='';}
-  $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t;}catch(e){toast(e.message);}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
+  function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%。請先核對。';$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識。';updateVerification(r.sequence.split(''),r);toast('辨識完成');}catch(e){$('recognizeInfo').textContent=e.message;setVerify('verifyOcr','辨識失敗','bad');toast('辨識失敗');}});input.value='';}
+  $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%';updateVerification(r.sequence.split(''),r);}catch(e){setVerify('verifyOcr','辨識失敗','bad');toast(e.message);}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
   function seq(){return($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);}$('replaceBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');if(state.current.length)state=Store.archive(state,'before-replace');state.current=s;state.ledger=[];save();toast('已取代目前鞋');};$('appendBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續序列');};
   $('replayBtn').onclick=function(){if(replayTimer){clearInterval(replayTimer);replayTimer=null;var syncData=Roads.data(state.current);
     var tieCount=state.current.filter(function(x){return x==="T";}).length;
@@ -340,6 +499,7 @@ var Recognizer=(function(){
     if($('syncBigCount'))$('syncBigCount').textContent=syncData.big.length;
     if($('syncTieCount'))$('syncTieCount').textContent=t;
     if($('syncStatus'))$('syncStatus').textContent=cur.length?(syncData.big.length===bpCount?'同步正常':'需要檢查'):'等待資料';
+    updateVerification(cur,Recognizer.getLast());
     $('lifeTotal').textContent=tot.total;$('lifeShoes').textContent=tot.shoes;$('lifeBPT').textContent=tot.b+' / '+tot.p+' / '+tot.t;$('lifeAccuracy').textContent=tot.decisions?(tot.correct/tot.decisions*100).toFixed(1)+'%（'+tot.correct+'/'+tot.decisions+'）':'尚無資料';$('samples').textContent=m.samples;$('streakWeight').textContent=(m.weights.bigRoad||1).toFixed(2);$('chopWeight').textContent=(m.weights.continuation||1).toFixed(2);$('recentWeight').textContent=(m.weights.recent5||1).toFixed(2);Roads.render(cur);}
   document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')Store.save(state);});
   window.addEventListener('pagehide',function(){Store.save(state);});
