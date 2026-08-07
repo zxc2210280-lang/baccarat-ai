@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V19 SINGLE LIVE">
-  <title>AI PRO V19 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V19.1 SINGLE LIVE">
+  <title>AI PRO V19.1 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V19 · VERIFIED ROADS</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V19.1 · STRICT VERIFIED ROADS</div></div>
     </header>
 
     <section class="panel">
@@ -580,7 +580,7 @@ var Recognizer=(function(){
     last={
       sequence:seq.join(''),count:seq.length,b:count.B,p:count.P,t:count.T,
       confidence:Math.round(avg*100),cells:cells,canvas:canvas,
-      source:'BEAD_CIRCLE_V19',profile:'INJA777_CIRCLE',quality:qualityNote
+      source:'BEAD_CIRCLE_V19_1',profile:'INJA777_CIRCLE',quality:qualityNote
     };
     return last;
   }
@@ -602,19 +602,83 @@ var Recognizer=(function(){
     if(!tr.length){tb.innerHTML='<tr><td colspan="6">等待辨識</td></tr>';return;}
     tr.slice(-60).forEach(function(x){var c=x.result==='B'?'tagB':x.result==='P'?'tagP':'tagT';var row=document.createElement('tr');row.innerHTML='<td>'+x.hand+'</td><td class="'+c+'">'+x.result+'</td><td>'+x.big+'</td><td>'+mark(x.eye)+'</td><td>'+mark(x.small)+'</td><td>'+mark(x.cock)+'</td>';tb.appendChild(row);});
   }
-  function updateVerification(seqData,ocr){var v=Roads.validate(seqData||[]);setVerify('verifyBig',v.big?'通過':'異常',v.big?'ok':'bad');setVerify('verifyEye',v.eye?'標準規則通過':'規則異常',v.eye?'ok':'bad');setVerify('verifySmall',v.small?'標準規則通過':'規則異常',v.small?'ok':'bad');setVerify('verifyCock',v.cock?'標準規則通過':'規則異常',v.cock?'ok':'bad');renderSourceAudit(seqData||[]);if(ocr){setVerify('verifyOcr',ocr.confidence+'%',ocr.confidence>=55?'ok':ocr.confidence>=35?'warn':'bad');setVerify('verifyGrid','x '+ocr.x0+' / y '+ocr.y0+' / 格 '+ocr.cell,'ok');$('verifyInfo').textContent='辨識 '+ocr.count+' 局；珠盤為唯一來源；大路與下三路全部由 B/P/T 重新演算。 '+(ocr.roadOK?'內部校驗通過':'內部校驗異常')+'。';}}
+  function updateVerification(seqData,ocr){var v=Roads.validate(seqData||[]);setVerify('verifyBig',v.big?'通過':'異常',v.big?'ok':'bad');setVerify('verifyEye',v.eye?'標準規則通過':'規則異常',v.eye?'ok':'bad');setVerify('verifySmall',v.small?'標準規則通過':'規則異常',v.small?'ok':'bad');setVerify('verifyCock',v.cock?'標準規則通過':'規則異常',v.cock?'ok':'bad');renderSourceAudit(seqData||[]);if(ocr){setVerify('verifyOcr',ocr.confidence+'%',ocr.confidence>=55?'ok':ocr.confidence>=35?'warn':'bad');setVerify('verifyGrid',ocr.profile||'自動圓點定位','ok');$('verifyInfo').textContent='辨識 '+ocr.count+' 局；珠盤為唯一來源；大路與下三路全部由 B/P/T 重新演算。 '+(ocr.roadOK?'內部校驗通過':'內部校驗異常')+'。';}}
 
   function save(){Store.save(state);render();}function analyze(){return AI.analyze(state.current,state.learning,state.ledger);}function add(actual){var before=analyze();state.current.push(actual);state.ledger.push({at:new Date().toISOString(),actual:actual,call:before.call,confidence:before.confidence,banker:before.banker.toFixed(1),player:before.player.toFixed(1),factors:before.factors});if(actual==='B'||actual==='P')state.learning=Learning.update(state.learning,before.factors,actual,before.call);save();}
   document.querySelectorAll('[data-result]').forEach(function(btn){btn.onclick=function(){add(btn.getAttribute('data-result'));};});
   $('undoBtn').onclick=function(){if(state.current.length){state.current.pop();state.ledger.pop();save();}};$('newShoeBtn').onclick=function(){state=Store.archive(state,'new-shoe');save();toast('已封存並開新鞋');};$('clearBtn').onclick=function(){if(confirm('確定清除目前鞋？')){state.current=[];state.ledger=[];save();}};
   $('exportBtn').onclick=function(){Store.exportJson(state);};$('exportCsvBtn').onclick=function(){Store.exportCsv(state);};$('importInput').onchange=function(){var f=this.files[0],input=this;if(!f)return;Store.importFile(f,function(err,s){if(err)return toast('備份讀取失敗');state=s;save();toast('備份已還原');});input.value='';};$('resetLearningBtn').onclick=function(){if(confirm('重設模型權重？')){state.learning=Learning.fresh();save();}};
+
+  function strictAudit(seqData,r){
+    var issues=[];
+    if(!seqData||seqData.length<6)issues.push('珠盤有效局數不足');
+
+    var cnt={B:0,P:0,T:0};
+    (seqData||[]).forEach(function(x){if(cnt[x]!==undefined)cnt[x]++;});
+    var total=cnt.B+cnt.P+cnt.T;
+    if(total!==seqData.length)issues.push('珠盤含無效符號');
+
+    // OCR-reported counts must exactly match the imported B/P/T sequence.
+    if(r){
+      if((r.b|0)!==cnt.B||(r.p|0)!==cnt.P||(r.t|0)!==cnt.T)
+        issues.push('OCR統計與珠盤序列不一致');
+      if((r.count|0)!==seqData.length)
+        issues.push('OCR局數與珠盤序列長度不一致');
+    }
+
+    // Big Road must contain exactly one cell per non-tie result.
+    var big=Roads.big(seqData||[]);
+    var bp=cnt.B+cnt.P;
+    if(big.length!==bp)issues.push('大路格數與莊閒局數不一致');
+
+    // Independent/reference derived-road validation already exists in Roads.validate.
+    var v=Roads.validate(seqData||[]);
+    if(!v.big)issues.push('大路內部校驗失敗');
+    if(!v.eye)issues.push('大眼仔雙演算法不一致');
+    if(!v.small)issues.push('小路雙演算法不一致');
+    if(!v.cock)issues.push('曱甴路雙演算法不一致');
+
+    // Reject clearly implausible color hallucinations.
+    if(total>=18){
+      var majority=Math.max(cnt.B,cnt.P,cnt.T)/total;
+      if(majority>.94)issues.push('珠盤結果過度單一');
+    }
+
+    return {
+      ok:issues.length===0,
+      issues:issues,
+      counts:cnt,
+      big:big.length,
+      eye:v.eye,small:v.small,cock:v.cock
+    };
+  }
+
   function applyRecognized(r,type){
     var s=(r.sequence||'').toUpperCase().match(/[BPT]/g)||[];
     if(!s.length)throw new Error('辨識不到有效珠盤序列');
+
     $('sequenceInput').value=s.join('');
-    $('recognizeInfo').textContent='辨識 '+s.length+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'｜信心 '+r.confidence+'%｜版型 '+(r.profile||'AUTO')+'｜已自動匯入本鞋';
-    if(type)$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識並自動匯入。';
+    var audit=strictAudit(s,r);
     updateVerification(s,r);
+
+    var auditText=audit.ok
+      ?'五路校驗全部通過'
+      :'校驗失敗：'+audit.issues.join('、');
+
+    $('recognizeInfo').textContent=
+      '辨識 '+s.length+' 局｜莊 '+audit.counts.B+'｜閒 '+audit.counts.P+'｜和 '+audit.counts.T+
+      '｜信心 '+r.confidence+'%｜'+auditText;
+
+    if(type)$('imageStatus').textContent=
+      (type==='camera'?'拍照':'截圖')+(audit.ok?'已完成辨識並通過校驗。':'已辨識，但未通過校驗，未匯入本鞋。');
+
+    if(!audit.ok){
+      setVerify('verifyOcr','校驗失敗','bad');
+      toast('未匯入：'+audit.issues[0]);
+      savePreviewImage();persistSession();
+      return;
+    }
+
     var old=state.current.join('');
     var next=s.join('');
     if(old!==next){
@@ -625,7 +689,8 @@ var Recognizer=(function(){
     }else{
       render();
     }
-    savePreviewImage();persistSession();toast('V19：辨識完成，已自動匯入並更新路單/預測');
+    savePreviewImage();persistSession();
+    toast('V19.1：五路校驗通過，已自動匯入');
   }
   function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();applyRecognized(r,type);}catch(e){$('recognizeInfo').textContent=e.message;setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}});input.value='';}
   $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();applyRecognized(r,'gallery');}catch(e){setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
