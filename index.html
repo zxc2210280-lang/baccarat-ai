@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#081426">
+  <meta name="application-name" content="AI PRO V17 SINGLE LIVE">
+  <title>AI PRO V17 SINGLE LIVE</title>
+  <style>
+:root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:900px;margin:auto;padding:18px}.hero{display:flex;justify-content:space-between;align-items:center;gap:12px}.hero h1{margin:0;font-size:28px}.hero p{color:var(--muted);margin:5px 0 18px}.status{background:#142842;border:1px solid var(--line);padding:9px 12px;border-radius:999px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:18px;margin:16px 0}h2{margin:0 0 14px}h3{margin:18px 0 8px;color:#dce8f7}
+.grid{display:grid;gap:10px}.buttons{grid-template-columns:repeat(2,1fr)}button,.fileBtn{min-height:54px;border-radius:15px;border:1px solid var(--line);background:#14243a;color:#fff;font-size:17px;font-weight:700;padding:10px;text-align:center;display:flex;align-items:center;justify-content:center}
+button:active,.fileBtn:active{transform:scale(.98)}.b{background:var(--red)}.p{background:var(--blue)}.t{background:var(--green)}.danger{color:#ff7782}.fileBtn input{display:none}
+.row{display:flex;gap:10px;margin-top:10px}.row>*{flex:1}.muted{color:var(--muted);line-height:1.5}.preview{width:100%;max-height:560px;object-fit:contain;border-radius:14px;margin:10px 0;background:#06101c}
+textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:16px}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;gap:8px}.stats b{font-size:31px;display:block}.stats span,.cards span{color:var(--muted)}
+.recommend{margin:16px auto 8px;max-width:260px;padding:15px;border-radius:14px;text-align:center;font-size:25px;font-weight:900;background:var(--gray)}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.cards>div{background:#0a1728;border:1px solid var(--line);border-radius:14px;padding:13px}.cards b{display:block;margin-top:6px;font-size:19px}
+.road{display:grid;grid-auto-flow:column;grid-template-rows:repeat(6,34px);grid-auto-columns:34px;justify-content:start;overflow-x:auto;min-height:210px;border:1px solid var(--line);border-radius:14px;padding:8px;background:#071525}
+.dot{width:28px;height:28px;border-radius:50%;margin:3px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;border:3px solid currentColor}.dot.fill{color:white}.dot.B{color:var(--red)}.dot.P{color:var(--blue)}.dot.T{color:var(--green)}.dot.fill.B{background:var(--red)}.dot.fill.P{background:var(--blue)}.dot.fill.T{background:var(--green)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#101a28;color:#fff;padding:12px 18px;border-radius:12px;opacity:0;pointer-events:none;transition:.2s;z-index:10}.toast.show{opacity:1}
+@media(min-width:700px){.buttons{grid-template-columns:repeat(4,1fr)}.cards{grid-template-columns:repeat(4,1fr)}}.risk{width:max-content;margin:8px auto;background:#142842;border:1px solid var(--line);padding:8px 12px;border-radius:999px}.factorGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.factor{background:#0a1728;border:1px solid var(--line);border-radius:12px;padding:10px}.factorTop{display:flex;justify-content:space-between;gap:8px}.bar{height:8px;border-radius:999px;background:#22344d;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;background:#e7b548}.history{display:flex;gap:8px;overflow-x:auto;margin-top:12px}.historyItem{min-width:105px;background:#0a1728;border:1px solid var(--line);border-radius:12px;padding:9px;font-size:13px}.hit{color:var(--green)}.miss{color:var(--red)}@media(max-width:560px){.factorGrid{grid-template-columns:1fr}}
+
+.buildBadge{margin-top:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px;text-align:center;background:#091729}
+
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <div>
+        <h1>AI PRO V17 SINGLE LIVE</h1>
+        <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
+      </div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V17 · SINGLE FILE</div></div>
+    </header>
+
+    <section class="panel">
+      <h2>本鞋輸入</h2>
+      <div class="grid buttons">
+        <button class="b" data-result="B">B 莊</button>
+        <button class="p" data-result="P">P 閒</button>
+        <button class="t" data-result="T">T 和</button>
+        <button id="undoBtn">復原</button>
+        <label class="fileBtn">選擇截圖<input id="galleryInput" type="file" accept="image/*"></label>
+        <label class="fileBtn">直接拍照<input id="cameraInput" type="file" accept="image/*" capture="environment"></label>
+        <button id="newShoeBtn">封存／新鞋</button>
+        <button id="clearBtn" class="danger">清除本鞋</button><button id="replayBtn">逐局回放</button>
+      </div>
+      <p class="muted" id="imageStatus">支援目前提供的 inja777 完整直式六路截圖。</p>
+      <img id="preview" class="preview" alt="">
+      <canvas id="debugCanvas" class="preview" hidden></canvas>
+      <div class="row">
+        <button id="toggleDebugBtn">顯示／隱藏辨識框</button>
+        <button id="recognizeBtn">重新辨識</button>
+      </div>
+      <textarea id="sequenceInput" rows="3" placeholder="辨識序列會出現在這裡，可手動修正 B/P/T"></textarea>
+      <div class="row">
+        <button id="replaceBtn">取代目前鞋</button>
+        <button id="appendBtn">接續目前鞋</button>
+      </div>
+      <p class="muted" id="recognizeInfo">尚未載入圖片。辨識後請先核對局數再匯入。</p>
+    </section>
+
+    <section class="panel">
+      <h2>目前分析</h2>
+      <div class="stats">
+        <div><b id="bPct">50.0%</b><span>莊傾向</span></div>
+        <div><b id="confidence">0%</b><span>信心度</span></div>
+        <div><b id="pPct">50.0%</b><span>閒傾向</span></div>
+      </div>
+      <div class="recommend" id="recommend">PASS</div>
+      <div id="riskBadge" class="risk">風險：高</div><div id="reason"></div><h3>14項分析來源</h3><div id="factorGrid" class="factorGrid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>目前鞋自動紀錄</h2>
+      <div class="cards">
+        <div><span>目前局數</span><b id="currentTotal">0</b></div>
+        <div><span>莊／閒／和</span><b id="currentBPT">0 / 0 / 0</b></div>
+        <div><span>有效建議</span><b id="shoeDecisions">0</b></div>
+        <div><span>本鞋命中率</span><b id="shoeAccuracy">尚無資料</b></div>
+      </div>
+      <div id="history" class="history"></div>
+    </section>
+
+    <section class="panel">
+      <h2>永久累積資料</h2>
+      <div class="cards">
+        <div><span>總局數</span><b id="lifeTotal">0</b></div>
+        <div><span>總鞋數</span><b id="lifeShoes">0</b></div>
+        <div><span>莊／閒／和</span><b id="lifeBPT">0 / 0 / 0</b></div>
+        <div><span>歷史建議命中</span><b id="lifeAccuracy">尚無資料</b></div>
+      </div>
+      <div class="row">
+        <button id="exportBtn">匯出 JSON 備份</button><button id="exportCsvBtn">匯出 CSV 紀錄</button>
+        <label class="fileBtn">還原備份<input id="importInput" type="file" accept="application/json"></label>
+      </div>
+      <p class="muted">資料保存在此瀏覽器。清除瀏覽器資料或換裝置前，請先匯出備份。</p>
+    </section>
+
+    <section class="panel">
+      <h2>路單</h2>
+      <h3>珠盤路</h3><div id="beadRoad" class="road"></div>
+      <h3>大路</h3><div id="bigRoad" class="road"></div>
+      <h3>大眼仔路</h3><div id="eyeRoad" class="road"></div>
+      <h3>小路</h3><div id="smallRoad" class="road"></div>
+      <h3>曱甴路</h3><div id="cockRoad" class="road"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Road Sync 同步檢查</h2>
+      <div class="cards">
+        <div><span>珠盤總局</span><b id="syncBeadCount">0</b></div>
+        <div><span>大路莊閒格</span><b id="syncBigCount">0</b></div>
+        <div><span>和局數</span><b id="syncTieCount">0</b></div>
+        <div><span>同步狀態</span><b id="syncStatus">等待資料</b></div>
+      </div>
+      <p class="muted">大路格數應等於珠盤路中的莊＋閒局數；和局只附著在上一個大路格，不另開新格。</p>
+    </section>
+
+    <section class="panel">
+      <h2>AI 學習狀態</h2>
+      <div class="cards">
+        <div><span>學習樣本</span><b id="samples">0</b></div>
+        <div><span>連莊權重</span><b id="streakWeight">1.00</b></div>
+        <div><span>跳路權重</span><b id="chopWeight">1.00</b></div>
+        <div><span>近期權重</span><b id="recentWeight">1.00</b></div>
+      </div>
+      <button id="resetLearningBtn" class="danger">重設學習權重</button>
+    </section>
+  </main>
+  <div id="toast" class="toast"></div>
+  <script>
+var Learning=(function(){
+  var KEYS=['bigRoad','recent5','recent10','bigEye','smallRoad','cockroach','threeRoad','ratio','turning','continuation','breakRisk','tieContext','sessionHistory','confidence'];
+  function fresh(){var w={};KEYS.forEach(function(k){w[k]=1;});return{samples:0,evaluated:0,correct:0,weights:w};}
+  function normalize(x){var f=fresh(),s=x||{};['samples','evaluated','correct'].forEach(function(k){if(typeof s[k]==='number')f[k]=s[k];});KEYS.forEach(function(k){if(s.weights&&typeof s.weights[k]==='number')f.weights[k]=Math.max(.5,Math.min(1.7,s.weights[k]));});return f;}
+  function update(model,factors,actual,call){var m=normalize(model);m.samples++;if(call==='B'||call==='P'){m.evaluated++;if(call===actual)m.correct++;}var lr=Math.max(.008,.06/Math.sqrt(Math.max(1,m.samples)));factors.forEach(function(f){if(f.direction!=='B'&&f.direction!=='P')return;var sign=f.direction===actual?1:-1;m.weights[f.key]=Math.max(.5,Math.min(1.7,m.weights[f.key]+sign*lr*Math.min(1,Math.abs(f.score)/10)));});return m;}
+  return{KEYS:KEYS,fresh:fresh,normalize:normalize,update:update};
+})();
+
+
+var Store=(function(){
+  var KEY='AI_PRO_V15_ULTIMATE_DATA';
+  function clean(a){return Array.isArray(a)?a.filter(function(x){return x==='B'||x==='P'||x==='T';}):[];}
+  function fresh(){return{version:15,current:[],shoes:[],ledger:[],learning:Learning.fresh(),createdAt:new Date().toISOString()};}
+  function normalize(s){var n=fresh();s=s||{};n.current=clean(s.current);n.shoes=Array.isArray(s.shoes)?s.shoes.map(function(sh){return{id:sh.id||'shoe-'+Date.now(),savedAt:sh.savedAt||new Date().toISOString(),source:sh.source||'unknown',results:clean(sh.results),ledger:Array.isArray(sh.ledger)?sh.ledger:[]};}):[];n.ledger=Array.isArray(s.ledger)?s.ledger:[];n.learning=Learning.normalize(s.learning);return n;}
+  function load(){try{var r=localStorage.getItem(KEY);return r?normalize(JSON.parse(r)):fresh();}catch(e){return fresh();}}
+  function save(s){try{localStorage.setItem(KEY,JSON.stringify(normalize(s)));return true;}catch(e){return false;}}
+  function archive(s,source){if(s.current.length){s.shoes.push({id:'shoe-'+Date.now(),savedAt:new Date().toISOString(),source:source||'manual',results:s.current.slice(),ledger:s.ledger.slice()});s.current=[];s.ledger=[];}return s;}
+  function totals(s){var all=[],led=[];s.shoes.forEach(function(sh){all=all.concat(clean(sh.results));led=led.concat(sh.ledger||[]);});all=all.concat(clean(s.current));led=led.concat(s.ledger);var b=0,p=0,t=0;all.forEach(function(x){if(x==='B')b++;else if(x==='P')p++;else t++;});var dec=led.filter(function(x){return x.call==='B'||x.call==='P';}),cor=dec.filter(function(x){return x.call===x.actual;}).length;return{total:all.length,b:b,p:p,t:t,shoes:s.shoes.length,decisions:dec.length,correct:cor};}
+  function dl(name,text,type){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type}));a.download=name;a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},500);}
+  function exportJson(s){dl('AI_PRO_V15_BACKUP_'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(normalize(s),null,2),'application/json');}
+  function exportCsv(s){var rows=[['鞋','局','時間','AI建議','實際','信心','莊傾向','閒傾向','結果']];s.shoes.concat([{id:'current',ledger:s.ledger}]).forEach(function(sh){(sh.ledger||[]).forEach(function(x,i){rows.push([sh.id,i+1,x.at||'',x.call||'PASS',x.actual||'',x.confidence||0,x.banker||50,x.player||50,(x.call==='B'||x.call==='P')?(x.call===x.actual?'命中':'失敗'):'PASS']);});});dl('AI_PRO_V15_RECORD_'+new Date().toISOString().slice(0,10)+'.csv','\ufeff'+rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n'),'text/csv');}
+  function importFile(file,cb){var r=new FileReader();r.onload=function(){try{cb(null,normalize(JSON.parse(r.result)));}catch(e){cb(e);}};r.onerror=function(){cb(new Error('read'));};r.readAsText(file);}
+  return{load:load,save:save,archive:archive,totals:totals,exportJson:exportJson,exportCsv:exportCsv,importFile:importFile};
+})();
+
+
+var Roads=(function(){
+  function bead(seq){
+    return seq.map(function(x,i){return{result:x,row:i%6,col:Math.floor(i/6),fill:true,ties:0};});
+  }
+
+  // Standard Big Road placement. Ties do not create a new cell; they attach to
+  // the latest Banker/Player cell. A new color starts from the next run column,
+  // not from the farthest dragon-tail column.
+  function big(seq){
+    var out=[],occ={},current=null,runStartCol=0,pendingTies=0;
+    seq.forEach(function(x){
+      if(x==='T'){
+        if(current)current.ties=(current.ties||0)+1;
+        else pendingTies++;
+        return;
+      }
+      if(!current){
+        current={result:x,row:0,col:0,ties:pendingTies};
+        pendingTies=0;runStartCol=0;out.push(current);occ['0,0']=current;return;
+      }
+      var row,col;
+      if(x===current.result){
+        // Continue downward when possible; otherwise form a dragon tail rightward.
+        if(current.row<5&&!occ[(current.row+1)+','+current.col]){
+          row=current.row+1;col=current.col;
+        }else{
+          row=current.row;col=current.col+1;
+          while(occ[row+','+col])col++;
+        }
+      }else{
+        // New streak starts at the top of the next base column.
+        row=0;col=runStartCol+1;
+        while(occ[row+','+col])col++;
+        runStartCol=col;
+      }
+      current={result:x,row:row,col:col,ties:0};
+      out.push(current);occ[row+','+col]=current;
+    });
+    return out;
+  }
+
+  function columnHeights(cells){
+    var h={};cells.forEach(function(c){h[c.col]=Math.max(h[c.col]||0,c.row+1);});return h;
+  }
+  function occupiedMap(cells){var o={};cells.forEach(function(c){o[c.row+','+c.col]=true;});return o;}
+
+  // Derived-road signals from Big Road geometry.
+  // offset: 1 Big Eye Boy, 2 Small Road, 3 Cockroach Road.
+  function derivedSignals(bigCells,offset){
+    var signals=[],heights=columnHeights(bigCells),occ=occupiedMap(bigCells);
+    bigCells.forEach(function(c){
+      var enough=(c.row===0?c.col>=offset+1:c.col>=offset);
+      if(!enough)return;
+      var red;
+      if(c.row===0){
+        var h1=heights[c.col-1]||0,h2=heights[c.col-1-offset]||0;
+        red=h1===h2;
+      }else{
+        red=!!occ[c.row+','+(c.col-offset)];
+      }
+      signals.push(red?'B':'P');
+    });
+    return signals;
+  }
+
+  function markerRoad(signals){
+    var cells=[],occ={},current=null,runStartCol=0;
+    signals.forEach(function(x){
+      if(!current){current={result:x,row:0,col:0,fill:true,ties:0};cells.push(current);occ['0,0']=true;return;}
+      var row,col;
+      if(x===current.result){
+        if(current.row<5&&!occ[(current.row+1)+','+current.col]){row=current.row+1;col=current.col;}
+        else{row=current.row;col=current.col+1;while(occ[row+','+col])col++;}
+      }else{
+        row=0;col=runStartCol+1;while(occ[row+','+col])col++;runStartCol=col;
+      }
+      current={result:x,row:row,col:col,fill:true,ties:0};cells.push(current);occ[row+','+col]=true;
+    });
+    return cells;
+  }
+
+  function data(seq){
+    var b=big(seq);
+    return{
+      bead:bead(seq),
+      big:b,
+      eye:markerRoad(derivedSignals(b,1)),
+      small:markerRoad(derivedSignals(b,2)),
+      cock:markerRoad(derivedSignals(b,3))
+    };
+  }
+
+  function draw(id,cells,fill){
+    var el=document.getElementById(id);if(!el)return;el.innerHTML='';
+    cells.forEach(function(c){
+      var d=document.createElement('div');
+      d.className='dot '+c.result+(fill||c.fill?' fill':'');
+      if(id==='beadRoad')d.textContent=c.result;
+      else if(id==='bigRoad'&&c.ties)d.textContent='T'+c.ties;
+      d.style.gridRow=(c.row+1);d.style.gridColumn=(c.col+1);el.appendChild(d);
+    });
+  }
+  function render(seq){var d=data(seq);draw('beadRoad',d.bead,true);draw('bigRoad',d.big,false);draw('eyeRoad',d.eye,true);draw('smallRoad',d.small,true);draw('cockRoad',d.cock,true);}
+  return{data:data,render:render,big:big};
+})();
+
+
+var AI=(function(){
+  var N={bigRoad:'大路型態',recent5:'最近5局',recent10:'最近10局',bigEye:'大眼仔',smallRoad:'小路',cockroach:'曱甴路',threeRoad:'三路共振',ratio:'莊閒比例',turning:'轉折訊號',continuation:'續路訊號',breakRisk:'斷路風險',tieContext:'和局影響',sessionHistory:'本鞋驗證',confidence:'訊號完整度'};
+  function nt(s){return s.filter(function(x){return x!=='T';});}function dir(a){if(!a.length)return null;var b=a.filter(function(x){return x==='B';}).length,p=a.length-b;return b>p?'B':p>b?'P':null;}function streak(a){var l=a[a.length-1]||null,n=0;for(var i=a.length-1;i>=0&&a[i]===l;i--)n++;return{last:l,n:n};}function alt(a){var n=1;for(var i=a.length-1;i>0&&a[i]!==a[i-1];i--)n++;return n;}function f(k,d,s,t){return{key:k,name:N[k],direction:d,score:s,detail:t};}
+  function analyze(seq,learning,ledger){var a=nt(seq),rd=Roads.data(seq),st=streak(a),al=alt(a),fs=[];fs.push(f('bigRoad',st.n>=3?st.last:(al>=4?(a[a.length-1]==='B'?'P':'B'):null),st.n>=3?Math.min(10,st.n*2):al>=4?7:2,st.n>=3?'連續 '+st.n+' 局':al>=4?'單跳 '+al+' 局':'混合'));fs.push(f('recent5',dir(a.slice(-5)),6,'近5局'));fs.push(f('recent10',dir(a.slice(-10)),5,'近10局'));function md(c){return dir(c.slice(-8).map(function(x){return x.result;}));}var e=md(rd.eye),sm=md(rd.small),c=md(rd.cock);fs.push(f('bigEye',e,e?5:0,e?'偏 '+e:'不足'));fs.push(f('smallRoad',sm,sm?5:0,sm?'偏 '+sm:'不足'));fs.push(f('cockroach',c,c?5:0,c?'偏 '+c:'不足'));var ds=[e,sm,c].filter(Boolean),co=dir(ds);fs.push(f('threeRoad',co,ds.length===3&&ds[0]===ds[1]&&ds[1]===ds[2]?9:ds.length?3:0,ds.length?ds.join('/'):'不足'));fs.push(f('ratio',dir(a.slice(-20)),4,'近20局'));fs.push(f('turning',st.n===1&&a.length>1?st.last:null,st.n===1?4:1,st.n===1?'剛轉色':'無'));fs.push(f('continuation',st.n>=2?st.last:null,st.n>=2?6:1,'連續訊號'));fs.push(f('breakRisk',st.n>=5?(st.last==='B'?'P':'B'):null,st.n>=5?5:1,st.n>=5?'長龍風險':'一般'));var ties=seq.slice(-8).filter(function(x){return x==='T';}).length;fs.push(f('tieContext',null,ties?1:0,'近8局和 '+ties));var dec=(ledger||[]).filter(function(x){return x.call==='B'||x.call==='P';}),cor=dec.filter(function(x){return x.call===x.actual;}).length,bad=dec.length>=6&&cor/dec.length<.45;fs.push(f('sessionHistory',bad?'PASS':null,bad?8:2,dec.length?'本鞋 '+(cor/dec.length*100).toFixed(1)+'%':'尚無'));fs.push(f('confidence',a.length>=12?dir(a.slice(-6)):null,a.length>=12?3:0,'有效局 '+a.length));var m=Learning.normalize(learning),sb=0,sp=0;fs.forEach(function(x){var impact=x.score*(m.weights[x.key]||1);if(x.direction==='B')sb+=impact;else if(x.direction==='P')sp+=impact;});var raw=sb+sp?(sb-sp)/(sb+sp):0,banker=Math.max(36,Math.min(64,50+raw*14)),player=100-banker,edge=Math.abs(banker-50),active=fs.filter(function(x){return x.direction==='B'||x.direction==='P';}).length,conf=Math.max(0,Math.min(94,Math.round(edge*4+active*4+(a.length>=12?10:0)))),call=bad||edge<5.5||conf<55?'PASS':banker>50?'B':'P';return{banker:banker,player:player,confidence:conf,call:call,risk:call==='PASS'?'高':conf>=75?'低':'中',factors:fs};}
+  return{analyze:analyze};
+})();
+
+
+var Recognizer=(function(){
+  var image=null;
+  function load(file,cb){
+    var r=new FileReader();r.onload=function(){var img=new Image();img.onload=function(){image=img;cb(null,img);};img.onerror=function(){cb(new Error("image"));};img.src=r.result;};r.onerror=function(){cb(new Error("read"));};r.readAsDataURL(file);
+  }
+  function classify(r,g,b){
+    var max=Math.max(r,g,b),min=Math.min(r,g,b);if(max-min<35)return null;
+    if(r>150&&r>g*1.18&&r>b*1.08)return"B";
+    if(b>135&&b>r*1.06&&b>g*1.02)return"P";
+    if(g>95&&g>r*1.02&&g>b*.72)return"T";
+    return null;
+  }
+  function recognize(){
+    if(!image)throw new Error("尚未載入圖片");
+    var w=image.naturalWidth,h=image.naturalHeight,canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+    var ctx=canvas.getContext("2d");ctx.drawImage(image,0,0,w,h);var data=ctx.getImageData(0,0,w,h).data;
+    var sx=w/710,sy=h/1536,cell=34*sx,x0=17*sx,expected=1074*sy,radius=Math.max(7,12*Math.min(sx,sy)),best=null;
+    function patch(x,y){
+      var counts={B:0,P:0,T:0},x1=Math.max(0,Math.floor(x-radius)),x2=Math.min(w-1,Math.ceil(x+radius)),y1=Math.max(0,Math.floor(y-radius)),y2=Math.min(h-1,Math.ceil(y+radius));
+      for(var yy=y1;yy<=y2;yy+=2)for(var xx=x1;xx<=x2;xx+=2){var i=(yy*w+xx)*4,c=classify(data[i],data[i+1],data[i+2]);if(c)counts[c]++;}
+      var arr=[["B",counts.B],["P",counts.P],["T",counts.T]].sort(function(a,b){return b[1]-a[1];});
+      return arr[0][1]>=18?arr[0][0]:null;
+    }
+    for(var dy=-80*sy;dy<=80*sy;dy+=4*sy){
+      var cells=[],seq=[],stop=false,y0=expected+dy;
+      for(var col=0;col<7&&!stop;col++)for(var row=0;row<6;row++){
+        var x=x0+col*cell,y=y0+row*cell,res=patch(x,y);cells.push({x:x,y:y,result:res,row:row,col:col});
+        if(res)seq.push(res);else{stop=true;break;}
+      }
+      var score=seq.length*100-Math.abs(dy)*.03;if(!best||score>best.score)best={score:score,seq:seq,cells:cells,canvas:canvas,y0:y0,cell:cell};
+    }
+    if(!best||best.seq.length<4)throw new Error("未找到 inja777 珠盤路");
+    var dbg=document.getElementById("debugCanvas");dbg.width=w;dbg.height=h;var d=dbg.getContext("2d");d.drawImage(image,0,0,w,h);d.lineWidth=Math.max(2,w/355);
+    best.cells.forEach(function(c){d.strokeStyle=c.result==="B"?"#f04455":c.result==="P"?"#347cf0":c.result==="T"?"#20be63":"#ffd166";d.strokeRect(c.x-best.cell/2,c.y-best.cell/2,best.cell,best.cell);});
+    var b=0,p=0,t=0;best.seq.forEach(function(x){if(x==="B")b++;else if(x==="P")p++;else t++;});
+    return{sequence:best.seq.join(""),count:best.seq.length,b:b,p:p,t:t};
+  }
+  return{load:load,recognize:recognize};
+})();
+
+(function(){
+  function $(id){return document.getElementById(id);}function toast(msg){var e=$('toast');e.textContent=msg;e.className='toast show';clearTimeout(toast.t);toast.t=setTimeout(function(){e.className='toast';},1700);}var state=Store.load(),replayTimer=null;
+  function save(){Store.save(state);render();}function analyze(){return AI.analyze(state.current,state.learning,state.ledger);}function add(actual){var before=analyze();state.current.push(actual);state.ledger.push({at:new Date().toISOString(),actual:actual,call:before.call,confidence:before.confidence,banker:before.banker.toFixed(1),player:before.player.toFixed(1),factors:before.factors});if(actual==='B'||actual==='P')state.learning=Learning.update(state.learning,before.factors,actual,before.call);save();}
+  document.querySelectorAll('[data-result]').forEach(function(btn){btn.onclick=function(){add(btn.getAttribute('data-result'));};});
+  $('undoBtn').onclick=function(){if(state.current.length){state.current.pop();state.ledger.pop();save();}};$('newShoeBtn').onclick=function(){state=Store.archive(state,'new-shoe');save();toast('已封存並開新鞋');};$('clearBtn').onclick=function(){if(confirm('確定清除目前鞋？')){state.current=[];state.ledger=[];save();}};
+  $('exportBtn').onclick=function(){Store.exportJson(state);};$('exportCsvBtn').onclick=function(){Store.exportCsv(state);};$('importInput').onchange=function(){var f=this.files[0],input=this;if(!f)return;Store.importFile(f,function(err,s){if(err)return toast('備份讀取失敗');state=s;save();toast('備份已還原');});input.value='';};$('resetLearningBtn').onclick=function(){if(confirm('重設模型權重？')){state.learning=Learning.fresh();save();}};
+  function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t+'。請先核對。';$('imageStatus').textContent=(type==='camera'?'拍照':'截圖')+'已完成辨識。';toast('辨識完成');}catch(e){$('recognizeInfo').textContent=e.message;toast('辨識失敗');}});input.value='';}
+  $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();$('sequenceInput').value=r.sequence;$('recognizeInfo').textContent='辨識 '+r.count+' 局｜莊 '+r.b+'｜閒 '+r.p+'｜和 '+r.t;}catch(e){toast(e.message);}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
+  function seq(){return($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);}$('replaceBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');if(state.current.length)state=Store.archive(state,'before-replace');state.current=s;state.ledger=[];save();toast('已取代目前鞋');};$('appendBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續序列');};
+  $('replayBtn').onclick=function(){if(replayTimer){clearInterval(replayTimer);replayTimer=null;var syncData=Roads.data(state.current);
+    var tieCount=state.current.filter(function(x){return x==="T";}).length;
+    var bpCount=state.current.filter(function(x){return x==="B"||x==="P";}).length;
+    if($("syncBeadCount"))$("syncBeadCount").textContent=state.current.length;
+    if($("syncBigCount"))$("syncBigCount").textContent=syncData.big.length;
+    if($("syncTieCount"))$("syncTieCount").textContent=tieCount;
+    if($("syncStatus"))$("syncStatus").textContent=syncData.big.length===bpCount?"同步正常":"需要檢查";
+    Roads.render(state.current);return;}var i=0,s=state.current.slice();if(!s.length)return toast('目前沒有資料');replayTimer=setInterval(function(){Roads.render(s.slice(0,++i));if(i>=s.length){clearInterval(replayTimer);replayTimer=null;}},260);};
+  function render(){var a=analyze(),cur=state.current,b=cur.filter(function(x){return x==='B';}).length,p=cur.filter(function(x){return x==='P';}).length,t=cur.filter(function(x){return x==='T';}).length,tot=Store.totals(state),m=Learning.normalize(state.learning);$('bPct').textContent=a.banker.toFixed(1)+'%';$('pPct').textContent=a.player.toFixed(1)+'%';$('confidence').textContent=a.confidence+'%';$('recommend').textContent=a.call==='B'?'B 莊':a.call==='P'?'P 閒':'PASS';$('recommend').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':'#53627a';$('riskBadge').textContent='風險：'+a.risk;
+    $('reason').innerHTML='';a.factors.filter(function(x){return x.direction&&x.score>=5;}).slice(0,5).forEach(function(x){var d=document.createElement('div');d.className='reasonItem';d.textContent=x.name+'：'+x.detail+'（'+x.direction+'，'+x.score+'分）';$('reason').appendChild(d);});$('factorGrid').innerHTML='';a.factors.forEach(function(x){var d=document.createElement('div');d.className='factor';d.innerHTML='<div class="factorTop"><b>'+x.name+'</b><span>'+(x.direction||'—')+' '+x.score+'</span></div><div class="muted">'+x.detail+'</div><div class="bar"><i style="width:'+Math.min(100,Math.abs(x.score)*8)+'%"></i></div>';$('factorGrid').appendChild(d);});
+    $('currentTotal').textContent=cur.length;$('currentBPT').textContent=b+' / '+p+' / '+t;var dec=state.ledger.filter(function(x){return x.call==='B'||x.call==='P';}),cor=dec.filter(function(x){return x.call===x.actual;}).length;$('shoeDecisions').textContent=dec.length;$('shoeAccuracy').textContent=dec.length?(cor/dec.length*100).toFixed(1)+'%（'+cor+'/'+dec.length+'）':'尚無資料';$('history').innerHTML='';state.ledger.slice(-12).forEach(function(x,i){var valid=x.call==='B'||x.call==='P',hit=valid&&x.call===x.actual,d=document.createElement('div');d.className='historyItem';d.innerHTML='第'+(state.ledger.length-Math.min(12,state.ledger.length)+i+1)+'局<br>AI：'+x.call+'<br>結果：'+x.actual+'<br><b class="'+(valid?(hit?'hit':'miss'):'')+'">'+(valid?(hit?'命中':'失敗'):'PASS')+'</b>';$('history').appendChild(d);});
+    var syncData=Roads.data(cur),bpCount=cur.filter(function(x){return x==='B'||x==='P';}).length;
+    if($('syncBeadCount'))$('syncBeadCount').textContent=cur.length;
+    if($('syncBigCount'))$('syncBigCount').textContent=syncData.big.length;
+    if($('syncTieCount'))$('syncTieCount').textContent=t;
+    if($('syncStatus'))$('syncStatus').textContent=cur.length?(syncData.big.length===bpCount?'同步正常':'需要檢查'):'等待資料';
+    $('lifeTotal').textContent=tot.total;$('lifeShoes').textContent=tot.shoes;$('lifeBPT').textContent=tot.b+' / '+tot.p+' / '+tot.t;$('lifeAccuracy').textContent=tot.decisions?(tot.correct/tot.decisions*100).toFixed(1)+'%（'+tot.correct+'/'+tot.decisions+'）':'尚無資料';$('samples').textContent=m.samples;$('streakWeight').textContent=(m.weights.bigRoad||1).toFixed(2);$('chopWeight').textContent=(m.weights.continuation||1).toFixed(2);$('recentWeight').textContent=(m.weights.recent5||1).toFixed(2);Roads.render(cur);}
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')Store.save(state);});
+  window.addEventListener('pagehide',function(){Store.save(state);});
+  window.addEventListener('beforeunload',function(){Store.save(state);});
+  window.addEventListener('error',function(e){$('status').textContent='載入異常';toast(e.message||'系統錯誤');});render();
+})();
+
+  </script>
+</body>
+</html>
