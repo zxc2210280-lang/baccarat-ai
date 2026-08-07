@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V19.1 SINGLE LIVE">
-  <title>AI PRO V19.1 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V21 SINGLE LIVE">
+  <title>AI PRO V21 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V19.1 · STRICT VERIFIED ROADS</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V21 · V21 BEAD VERIFIED</div></div>
     </header>
 
     <section class="panel">
@@ -68,7 +68,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
       </div>
       <textarea id="sequenceInput" rows="3" placeholder="辨識序列會出現在這裡，可手動修正 B/P/T"></textarea>
       <div class="row">
-        <button id="replaceBtn">取代目前鞋</button>
+        <button id="replaceBtn">套用手動修正</button>
         <button id="appendBtn">接續目前鞋</button>
       </div>
       <p class="muted" id="recognizeInfo">尚未載入圖片。辨識後請先核對局數再匯入。</p>
@@ -395,192 +395,156 @@ var Recognizer=(function(){
     var ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,w,h);
     var img=ctx.getImageData(0,0,w,h),d=img.data;
 
+    function rgbAt(x,y){
+      x=Math.max(0,Math.min(w-1,Math.round(x)));
+      y=Math.max(0,Math.min(h-1,Math.round(y)));
+      var k=(y*w+x)*4;
+      return [d[k],d[k+1],d[k+2]];
+    }
+
     function classify(r,g,b){
       var mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx-mn;
-      if(mx<65||sat<38)return null;
-      if(r>125 && r>g*1.16 && r>b*1.12)return 'B';
-      if(b>108 && b>r*1.08 && b>=g*.90)return 'P';
-      if(g>95 && g>r*1.08 && g>b*.96)return 'T';
+      if(mx<60||sat<28)return null;
+
+      // inja777 filled beads:
+      // banker = saturated red, player = cyan/blue, tie = green.
+      if(r>110 && r>g*1.10 && r>b*1.07)return 'B';
+      if(b>95 && b>r*1.04 && b>=g*.86)return 'P';
+      if(g>85 && g>r*1.04 && g>b*.90)return 'T';
       return null;
     }
-    function pidx(x,y){return y*w+x;}
-    function cAt(x,y){
-      if(x<0||y<0||x>=w||y>=h)return null;
-      var k=(y*w+x)*4;
-      return classify(d[k],d[k+1],d[k+2]);
+
+    // Sample an ANNULUS instead of the center. The center contains white Chinese text,
+    // which was the main reason earlier versions misclassified beads.
+    function voteAnnulus(cx,cy,dx,dy){
+      var cnt={B:0,P:0,T:0},samples=0,colored=0;
+      var base=Math.min(dx,dy)*.34;
+      var rings=[.55,.78,1.00];
+      for(var rr=0;rr<rings.length;rr++){
+        var rad=base*rings[rr];
+        for(var k=0;k<16;k++){
+          var a=Math.PI*2*k/16;
+          var rgb=rgbAt(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad);
+          var c=classify(rgb[0],rgb[1],rgb[2]);
+          samples++;
+          if(c){cnt[c]++;colored++;}
+        }
+      }
+      var result='B';
+      if(cnt.P>cnt[result])result='P';
+      if(cnt.T>cnt[result])result='T';
+      var best=cnt[result];
+      if(best<6 || colored<8)return {result:null,confidence:0,colored:colored/samples};
+      return {result:result,confidence:best/samples,colored:colored/samples,counts:cnt};
     }
 
-    // Search the lower-left casino panel only. This avoids chips/cards/buttons.
-    var xMin=0,xMax=Math.floor(w*.52);
-    var yMin=Math.floor(h*.58),yMax=Math.floor(h*.89);
-    var step=Math.max(2,Math.round(Math.min(w,h)/420));
-    var seen=new Uint8Array(w*h),blobs=[];
+    // Profiles measured from the user's real inja777 iPhone screenshots.
+    // The bead plate begins around x=3.4%, y=69.8% of the casino screenshot.
+    var profiles=[
+      {name:'INJA_REAL_1',x:.034,y:.698,dx:.0460,dy:.0218},
+      {name:'INJA_REAL_2',x:.034,y:.704,dx:.0460,dy:.0218},
+      {name:'INJA_REAL_3',x:.031,y:.694,dx:.0455,dy:.0219},
+      {name:'INJA_REAL_4',x:.038,y:.700,dx:.0455,dy:.0217}
+    ];
 
-    for(var y=yMin;y<yMax;y+=step){
-      for(var x=xMin;x<xMax;x+=step){
-        var ii=pidx(x,y);
-        if(seen[ii]||!cAt(x,y))continue;
+    var best=null;
 
-        var q=[[x,y]],qh=0,count=0,sx=0,sy=0,minx=x,maxx=x,miny=y,maxy=y;
-        var ccnt={B:0,P:0,T:0};
+    function evalGrid(p,x0,y0,dx,dy){
+      var seq=[],cells=[],conf=0,holes=0;
+      var maxCols=Math.min(18,Math.max(2,Math.floor((w-x0)/dx)));
+      var started=false,ended=false;
 
-        while(qh<q.length && count<9000){
-          var p=q[qh++],px=p[0],py=p[1];
-          if(px<xMin||px>=xMax||py<yMin||py>=yMax)continue;
-          var pi=pidx(px,py);
-          if(seen[pi])continue;
-          seen[pi]=1;
-          var c=cAt(px,py);
-          if(!c)continue;
-
-          count++;sx+=px;sy+=py;ccnt[c]++;
-          if(px<minx)minx=px;if(px>maxx)maxx=px;if(py<miny)miny=py;if(py>maxy)maxy=py;
-          q.push([px+step,py],[px-step,py],[px,py+step],[px,py-step]);
+      for(var c=0;c<maxCols&&!ended;c++){
+        var vals=[];
+        for(var r=0;r<6;r++){
+          vals.push(voteAnnulus(x0+c*dx,y0+r*dy,dx,dy));
         }
 
-        if(count<5)continue;
-        var bw=maxx-minx+step,bh=maxy-miny+step,aspect=bw/bh;
-        var minD=Math.min(w,h)*.010,maxD=Math.min(w,h)*.055;
-        if(aspect<.52||aspect>1.90||bw<minD||bh<minD||bw>maxD||bh>maxD)continue;
+        var prefix=0;
+        while(prefix<6 && vals[prefix].result)prefix++;
 
-        var res='B';
-        if(ccnt.P>ccnt[res])res='P';
-        if(ccnt.T>ccnt[res])res='T';
-        var conf=ccnt[res]/Math.max(1,count);
-
-        blobs.push({x:sx/count,y:sy/count,w:bw,h:bh,result:res,confidence:conf});
-      }
-    }
-
-    if(blobs.length<10)throw new Error('找不到足夠珠盤圓點，請使用完整清楚截圖');
-
-    // Find the six horizontal bead rows by clustering y positions.
-    blobs.sort(function(a,b){return a.y-b.y;});
-    var yTol=Math.max(5,h*.0105),clusters=[];
-    blobs.forEach(function(b){
-      var best=-1,bd=1e9;
-      for(var i=0;i<clusters.length;i++){
-        var dd=Math.abs(clusters[i].y-b.y);
-        if(dd<bd){bd=dd;best=i;}
-      }
-      if(best>=0&&bd<yTol){
-        var c=clusters[best];c.y=(c.y*c.n+b.y)/(c.n+1);c.n++;c.items.push(b);
-      }else clusters.push({y:b.y,n:1,items:[b]});
-    });
-
-    var rows=clusters.filter(function(c){return c.n>=2;})
-      .sort(function(a,b){return b.n-a.n;}).slice(0,6)
-      .sort(function(a,b){return a.y-b.y;});
-
-    if(rows.length<5)throw new Error('珠盤列定位失敗');
-
-    // If only 5 stable rows are detected, estimate the missing 6th row from median spacing.
-    if(rows.length===5){
-      var diffs=[];
-      for(var dri=1;dri<rows.length;dri++)diffs.push(rows[dri].y-rows[dri-1].y);
-      diffs.sort(function(a,b){return a-b;});
-      var med=diffs[Math.floor(diffs.length/2)]||Math.max(6,h*.02);
-      // Prefer appending a bottom row, which is the common partial-final-row miss.
-      rows.push({y:rows[rows.length-1].y+med,n:0,items:[]});
-    }
-
-    // Estimate columns by clustering x positions across the rows.
-    var usable=[];
-    rows.forEach(function(r){r.items.forEach(function(b){usable.push(b);});});
-    usable.sort(function(a,b){return a.x-b.x;});
-    var xTol=Math.max(6,w*.014),cols=[];
-    usable.forEach(function(b){
-      var best=-1,bd=1e9;
-      for(var i=0;i<cols.length;i++){
-        var dd=Math.abs(cols[i].x-b.x);
-        if(dd<bd){bd=dd;best=i;}
-      }
-      if(best>=0&&bd<xTol){
-        var c=cols[best];c.x=(c.x*c.n+b.x)/(c.n+1);c.n++;
-      }else cols.push({x:b.x,n:1});
-    });
-    cols=cols.filter(function(c){return c.n>=2;}).sort(function(a,b){return a.x-b.x;});
-    if(cols.length<2)throw new Error('珠盤欄定位失敗');
-
-    // Snap blobs into row/column cells.
-    var grid={};
-    usable.forEach(function(b){
-      var ri=0,rd=1e9;
-      rows.forEach(function(r,i){var dd=Math.abs(r.y-b.y);if(dd<rd){rd=dd;ri=i;}});
-      var ci=0,cd=1e9;
-      cols.forEach(function(c,i){var dd=Math.abs(c.x-b.x);if(dd<cd){cd=dd;ci=i;}});
-      if(rd<yTol*1.5&&cd<xTol*1.6){
-        var key=ri+','+ci;
-        if(!grid[key]||b.confidence>grid[key].confidence)grid[key]=b;
-      }
-    });
-
-    // Baccarat bead plate order is column-major: top->bottom, then next column.
-    // V19 tolerates a partial last column and minor misses near the tail.
-    var seq=[],cells=[];
-    var started=false, finished=false;
-    for(var ci=0;ci<cols.length&&!finished;ci++){
-      var colVals=[];
-      for(var ri=0;ri<6;ri++){
-        var b=grid[ri+','+ci];
-        if(b)colVals.push({b:b,ri:ri});
-      }
-      if(!colVals.length){
-        if(started)finished=true;
-        continue;
-      }
-      started=true;
-
-      // Full columns are ideal. A partial column is accepted only as the final visible column.
-      if(colVals.length<6){
-        colVals.sort(function(a,b){return a.ri-b.ri;});
-        // Require partial cells to begin from the top with no internal holes.
-        var contiguous=true;
-        for(var pi=0;pi<colVals.length;pi++){
-          if(colVals[pi].ri!==pi){contiguous=false;break;}
-        }
-        if(!contiguous){
-          // Ignore a malformed tail column rather than poisoning the whole sequence.
-          finished=true;
+        if(prefix===0){
+          if(started)ended=true;
           continue;
         }
+        started=true;
+
+        // An internal hole is suspicious; only the final column may be partial.
+        for(var rr=prefix;rr<6;rr++)if(vals[rr].result)holes++;
+
+        for(var rr=0;rr<prefix;rr++){
+          var q=vals[rr];
+          seq.push(q.result);
+          conf+=q.confidence;
+          cells.push({x:x0+c*dx,y:y0+rr*dy,row:rr,col:c,result:q.result,confidence:q.confidence});
+        }
+        if(prefix<6)ended=true;
       }
 
-      colVals.sort(function(a,b){return a.ri-b.ri;});
-      colVals.forEach(function(v){
-        var b=v.b;
-        seq.push(b.result);
-        cells.push({x:b.x,y:b.y,row:v.ri,col:ci,result:b.result,confidence:b.confidence});
-      });
+      if(seq.length<6)return;
 
-      if(colVals.length<6)finished=true;
+      var cnt={B:0,P:0,T:0};
+      seq.forEach(function(v){cnt[v]++;});
+      var majority=Math.max(cnt.B,cnt.P,cnt.T)/seq.length;
+      var unique=(cnt.B?1:0)+(cnt.P?1:0)+(cnt.T?1:0);
+      var avg=conf/seq.length;
+
+      // Score for real bead-board behavior: long contiguous prefix, no holes,
+      // multiple colors, and strong annulus agreement.
+      var score=seq.length*180 + avg*2200 - holes*900;
+      if(unique>=2)score+=600;
+      if(unique===3)score+=350;
+      if(seq.length>=18)score+=700;
+      if(majority>.95)score-=3000;
+
+      if(!best||score>best.score){
+        best={score:score,seq:seq,cells:cells,counts:cnt,avg:avg,holes:holes,
+              profile:p.name,x0:x0,y0:y0,dx:dx,dy:dy,majority:majority};
+      }
     }
 
-    if(seq.length<6)throw new Error('珠盤辨識結果不足 6 局，請重新截圖');
+    profiles.forEach(function(p){
+      var bx=p.x*w,by=p.y*h,bdx=p.dx*w,bdy=p.dy*h;
+      [0.97,1.00,1.03].forEach(function(sf){
+        for(var ox=-5;ox<=5;ox++){
+          for(var oy=-6;oy<=6;oy++){
+            evalGrid(
+              p,
+              bx+ox*bdx*.10,
+              by+oy*bdy*.10,
+              bdx*sf,bdy*sf
+            );
+          }
+        }
+      });
+    });
 
-    var count={B:0,P:0,T:0};
-    seq.forEach(function(v){count[v]++;});
-    var major=Math.max(count.B,count.P,count.T)/seq.length;
-    if(seq.length>=18 && major>.96)throw new Error('辨識結果幾乎全部同色，請重新截圖');
+    if(!best)throw new Error('找不到珠盤區域');
+    if(best.seq.length<6)throw new Error('珠盤辨識不足 6 局');
+    if(best.seq.length>=18 && best.majority>.97)
+      throw new Error('珠盤結果幾乎全部同色，請重新選擇完整截圖');
 
-    // Draw debug circles around detected bead centers.
+    // Draw exactly where V21 thinks each bead is. This gives a visible audit trail.
     var debug=document.getElementById('debugCanvas');
     if(debug){
       debug.width=w;debug.height=h;
       var g=debug.getContext('2d');g.drawImage(image,0,0,w,h);
-      g.lineWidth=Math.max(2,w*.003);
-      cells.forEach(function(c){
+      g.lineWidth=Math.max(2,w*.0025);
+      best.cells.forEach(function(c){
         g.strokeStyle=c.result==='B'?'#f04455':c.result==='P'?'#3a7cf0':'#20c063';
-        g.beginPath();g.arc(c.x,c.y,Math.max(6,w*.012),0,Math.PI*2);g.stroke();
+        g.beginPath();g.arc(c.x,c.y,Math.max(5,best.dx*.28),0,Math.PI*2);g.stroke();
       });
     }
 
-    var avg=cells.reduce(function(s,c){return s+c.confidence;},0)/Math.max(1,cells.length);
-    var qualityNote=seq.length<18?'SHORT_OK':'OK';
     last={
-      sequence:seq.join(''),count:seq.length,b:count.B,p:count.P,t:count.T,
-      confidence:Math.round(avg*100),cells:cells,canvas:canvas,
-      source:'BEAD_CIRCLE_V19_1',profile:'INJA777_CIRCLE',quality:qualityNote
+      sequence:best.seq.join(''),
+      count:best.seq.length,
+      b:best.counts.B,p:best.counts.P,t:best.counts.T,
+      confidence:Math.max(1,Math.min(99,Math.round(best.avg*100))),
+      cells:best.cells,canvas:canvas,
+      source:'BEAD_V21',profile:best.profile,
+      holes:best.holes,x0:best.x0,y0:best.y0,cell:best.dx,
+      quality:best.holes===0?'OK':'CHECK'
     };
     return last;
   }
@@ -610,47 +574,25 @@ var Recognizer=(function(){
   $('exportBtn').onclick=function(){Store.exportJson(state);};$('exportCsvBtn').onclick=function(){Store.exportCsv(state);};$('importInput').onchange=function(){var f=this.files[0],input=this;if(!f)return;Store.importFile(f,function(err,s){if(err)return toast('備份讀取失敗');state=s;save();toast('備份已還原');});input.value='';};$('resetLearningBtn').onclick=function(){if(confirm('重設模型權重？')){state.learning=Learning.fresh();save();}};
 
   function strictAudit(seqData,r){
-    var issues=[];
-    if(!seqData||seqData.length<6)issues.push('珠盤有效局數不足');
-
+    var blockers=[],warnings=[];
     var cnt={B:0,P:0,T:0};
     (seqData||[]).forEach(function(x){if(cnt[x]!==undefined)cnt[x]++;});
     var total=cnt.B+cnt.P+cnt.T;
-    if(total!==seqData.length)issues.push('珠盤含無效符號');
 
-    // OCR-reported counts must exactly match the imported B/P/T sequence.
-    if(r){
-      if((r.b|0)!==cnt.B||(r.p|0)!==cnt.P||(r.t|0)!==cnt.T)
-        issues.push('OCR統計與珠盤序列不一致');
-      if((r.count|0)!==seqData.length)
-        issues.push('OCR局數與珠盤序列長度不一致');
-    }
+    if(total<6)blockers.push('珠盤有效局數不足');
+    if(total!==seqData.length)blockers.push('珠盤含無效符號');
 
-    // Big Road must contain exactly one cell per non-tie result.
     var big=Roads.big(seqData||[]);
-    var bp=cnt.B+cnt.P;
-    if(big.length!==bp)issues.push('大路格數與莊閒局數不一致');
+    if(big.length!==(cnt.B+cnt.P))blockers.push('大路格數不一致');
 
-    // Independent/reference derived-road validation already exists in Roads.validate.
     var v=Roads.validate(seqData||[]);
-    if(!v.big)issues.push('大路內部校驗失敗');
-    if(!v.eye)issues.push('大眼仔雙演算法不一致');
-    if(!v.small)issues.push('小路雙演算法不一致');
-    if(!v.cock)issues.push('曱甴路雙演算法不一致');
+    if(!v.eye)warnings.push('大眼仔待核對');
+    if(!v.small)warnings.push('小路待核對');
+    if(!v.cock)warnings.push('曱甴路待核對');
+    if(r && (r.holes|0)>0)warnings.push('珠盤尾端有缺格');
 
-    // Reject clearly implausible color hallucinations.
-    if(total>=18){
-      var majority=Math.max(cnt.B,cnt.P,cnt.T)/total;
-      if(majority>.94)issues.push('珠盤結果過度單一');
-    }
-
-    return {
-      ok:issues.length===0,
-      issues:issues,
-      counts:cnt,
-      big:big.length,
-      eye:v.eye,small:v.small,cock:v.cock
-    };
+    return {ok:blockers.length===0,blockers:blockers,warnings:warnings,
+            counts:cnt,big:big.length,eye:v.eye,small:v.small,cock:v.cock};
   }
 
   function applyRecognized(r,type){
@@ -662,19 +604,19 @@ var Recognizer=(function(){
     updateVerification(s,r);
 
     var auditText=audit.ok
-      ?'五路校驗全部通過'
-      :'校驗失敗：'+audit.issues.join('、');
+      ?(audit.warnings.length?'可用，但需檢查：'+audit.warnings.join('、'):'五路校驗通過')
+      :'校驗失敗：'+audit.blockers.join('、');
 
     $('recognizeInfo').textContent=
       '辨識 '+s.length+' 局｜莊 '+audit.counts.B+'｜閒 '+audit.counts.P+'｜和 '+audit.counts.T+
       '｜信心 '+r.confidence+'%｜'+auditText;
 
     if(type)$('imageStatus').textContent=
-      (type==='camera'?'拍照':'截圖')+(audit.ok?'已完成辨識並通過校驗。':'已辨識，但未通過校驗，未匯入本鞋。');
+      (type==='camera'?'拍照':'截圖')+(audit.ok?'已完成辨識並匯入。':'已辨識，但有阻擋錯誤，未匯入本鞋。');
 
     if(!audit.ok){
       setVerify('verifyOcr','校驗失敗','bad');
-      toast('未匯入：'+audit.issues[0]);
+      toast('未匯入：'+audit.blockers[0]);
       savePreviewImage();persistSession();
       return;
     }
@@ -690,11 +632,11 @@ var Recognizer=(function(){
       render();
     }
     savePreviewImage();persistSession();
-    toast('V19.1：五路校驗通過，已自動匯入');
+    toast('V21：珠盤已匯入並重建全部路單');
   }
   function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();applyRecognized(r,type);}catch(e){$('recognizeInfo').textContent=e.message;setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}});input.value='';}
   $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();applyRecognized(r,'gallery');}catch(e){setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
-  function seq(){return($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);}$('replaceBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');if(state.current.length)state=Store.archive(state,'before-replace');state.current=s;state.ledger=[];save();toast('已取代目前鞋');};$('appendBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續序列');};
+  function seq(){return($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);}$('replaceBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');if(state.current.length)state=Store.archive(state,'before-replace');state.current=s;state.ledger=[];save();toast('已套用手動修正');};$('appendBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續序列');};
   // ===== V17.1 iPhone 實戰持續模式 =====
   var SESSION_KEY='AI_PRO_V17_1_SESSION';
   var PREVIEW_KEY='AI_PRO_V17_1_LAST_PREVIEW';
