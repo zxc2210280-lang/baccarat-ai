@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#081426">
-  <meta name="application-name" content="AI PRO V21 SINGLE LIVE">
-  <title>AI PRO V21 SINGLE LIVE</title>
+  <meta name="application-name" content="AI PRO V21.1 SINGLE LIVE">
+  <title>AI PRO V21.1 SINGLE LIVE</title>
   <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gray:#53627a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -44,7 +44,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <h1>AI PRO V17 SINGLE LIVE</h1>
         <p>inja777 專用辨識・逐局分析・14項來源・自我驗證</p>
       </div>
-      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V21 · V21 BEAD VERIFIED</div></div>
+      <div><div class="status" id="status">已啟動</div><div class="buildBadge">BUILD V21.1 · V21 BEAD VERIFIED</div></div>
     </header>
 
     <section class="panel">
@@ -68,7 +68,7 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
       </div>
       <textarea id="sequenceInput" rows="3" placeholder="辨識序列會出現在這裡，可手動修正 B/P/T"></textarea>
       <div class="row">
-        <button id="replaceBtn">套用手動修正</button>
+        <button id="replaceBtn">確認序列並匯入</button>
         <button id="appendBtn">接續目前鞋</button>
       </div>
       <p class="muted" id="recognizeInfo">尚未載入圖片。辨識後請先核對局數再匯入。</p>
@@ -542,7 +542,7 @@ var Recognizer=(function(){
       b:best.counts.B,p:best.counts.P,t:best.counts.T,
       confidence:Math.max(1,Math.min(99,Math.round(best.avg*100))),
       cells:best.cells,canvas:canvas,
-      source:'BEAD_V21',profile:best.profile,
+      source:'BEAD_V21_1',profile:best.profile,
       holes:best.holes,x0:best.x0,y0:best.y0,cell:best.dx,
       quality:best.holes===0?'OK':'CHECK'
     };
@@ -595,48 +595,66 @@ var Recognizer=(function(){
             counts:cnt,big:big.length,eye:v.eye,small:v.small,cock:v.cock};
   }
 
+  var pendingRecognized=null;
+
   function applyRecognized(r,type){
     var s=(r.sequence||'').toUpperCase().match(/[BPT]/g)||[];
     if(!s.length)throw new Error('辨識不到有效珠盤序列');
 
+    pendingRecognized={
+      sequence:s.slice(),
+      raw:r,
+      type:type||'gallery'
+    };
+
     $('sequenceInput').value=s.join('');
-    var audit=strictAudit(s,r);
     updateVerification(s,r);
 
-    var auditText=audit.ok
-      ?(audit.warnings.length?'可用，但需檢查：'+audit.warnings.join('、'):'五路校驗通過')
-      :'校驗失敗：'+audit.blockers.join('、');
+    var cnt={B:0,P:0,T:0};
+    s.forEach(function(x){if(cnt[x]!==undefined)cnt[x]++;});
 
     $('recognizeInfo').textContent=
-      '辨識 '+s.length+' 局｜莊 '+audit.counts.B+'｜閒 '+audit.counts.P+'｜和 '+audit.counts.T+
-      '｜信心 '+r.confidence+'%｜'+auditText;
+      '辨識 '+s.length+' 局｜莊 '+cnt.B+'｜閒 '+cnt.P+'｜和 '+cnt.T+
+      '｜信心 '+r.confidence+'%｜請先核對 B/P/T 序列，確認後再匯入';
 
     if(type)$('imageStatus').textContent=
-      (type==='camera'?'拍照':'截圖')+(audit.ok?'已完成辨識並匯入。':'已辨識，但有阻擋錯誤，未匯入本鞋。');
+      (type==='camera'?'拍照':'截圖')+'已完成珠盤辨識，尚未匯入本鞋。';
 
-    if(!audit.ok){
-      setVerify('verifyOcr','校驗失敗','bad');
-      toast('未匯入：'+audit.blockers[0]);
-      savePreviewImage();persistSession();
-      return;
-    }
-
-    var old=state.current.join('');
-    var next=s.join('');
-    if(old!==next){
-      if(state.current.length)state=Store.archive(state,'before-ocr-replace');
-      state.current=s.slice();
-      state.ledger=[];
-      save();
-    }else{
-      render();
-    }
+    // Do NOT auto-import. Keep current shoe untouched until user confirms.
+    setVerify('verifyOcr','等待人工確認','warn');
     savePreviewImage();persistSession();
-    toast('V21：珠盤已匯入並重建全部路單');
+    toast('已辨識，請先核對序列再匯入');
+  }
+
+  function confirmRecognizedImport(){
+    var s=($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);
+    if(!s.length)return toast('沒有可匯入的序列');
+
+    var audit=strictAudit(s,pendingRecognized?pendingRecognized.raw:null);
+    if(!audit.ok){
+      $('recognizeInfo').textContent='無法匯入：'+audit.blockers.join('、');
+      setVerify('verifyOcr','校驗失敗','bad');
+      return toast('序列校驗失敗');
+    }
+
+    if(state.current.length)state=Store.archive(state,'before-confirmed-ocr');
+    state.current=s.slice();
+    state.ledger=[];
+    save();
+    updateVerification(s,pendingRecognized?pendingRecognized.raw:null);
+
+    $('recognizeInfo').textContent=
+      '已確認並匯入 '+s.length+' 局｜莊 '+audit.counts.B+'｜閒 '+audit.counts.P+'｜和 '+audit.counts.T+
+      (audit.warnings&&audit.warnings.length?'｜提醒：'+audit.warnings.join('、'):'｜校驗通過');
+
+    if($('imageStatus'))$('imageStatus').textContent='已確認序列並匯入本鞋，路單與預測已更新。';
+    pendingRecognized=null;
+    setVerify('verifyOcr','已人工確認','ok');
+    toast('已確認序列並更新路單/預測');
   }
   function loadImage(input,type){var f=input.files[0];if(!f)return;Recognizer.load(f,function(err,img){if(err)return toast('圖片載入失敗');$('preview').src=img.src;$('preview').style.display='block';try{var r=Recognizer.recognize();applyRecognized(r,type);}catch(e){$('recognizeInfo').textContent=e.message;setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}});input.value='';}
   $('galleryInput').onchange=function(){loadImage(this,'gallery');};$('cameraInput').onchange=function(){loadImage(this,'camera');};$('recognizeBtn').onclick=function(){try{var r=Recognizer.recognize();applyRecognized(r,'gallery');}catch(e){setVerify('verifyOcr','辨識失敗','bad');toast(e.message||'辨識失敗');}};$('toggleDebugBtn').onclick=function(){var c=$('debugCanvas');c.hidden=!c.hidden;c.style.display=c.hidden?'none':'block';};
-  function seq(){return($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);}$('replaceBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');if(state.current.length)state=Store.archive(state,'before-replace');state.current=s;state.ledger=[];save();toast('已套用手動修正');};$('appendBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續序列');};
+  function seq(){return($('sequenceInput').value.toUpperCase().match(/[BPT]/g)||[]);}$('replaceBtn').onclick=confirmRecognizedImport;$('appendBtn').onclick=function(){var s=seq();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續序列');};
   // ===== V17.1 iPhone 實戰持續模式 =====
   var SESSION_KEY='AI_PRO_V17_1_SESSION';
   var PREVIEW_KEY='AI_PRO_V17_1_LAST_PREVIEW';
