@@ -27,6 +27,14 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
 
   
 .verifyGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.verifyBox{background:#0a1728;border:1px solid var(--line);border-radius:14px;padding:12px}.verifyBox b{display:block;font-size:18px;margin-top:4px}.ok{color:var(--green)}.warn{color:#ffd166}.bad{color:var(--red)}@media(max-width:560px){.verifyGrid{grid-template-columns:1fr}}
+
+    .sourceSeq{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;font-size:15px;line-height:1.55;padding:12px;border:1px solid #294767;border-radius:12px;background:#071626}
+    .traceWrap{overflow:auto;max-height:360px;border:1px solid #294767;border-radius:12px}
+    .traceTable{width:100%;border-collapse:collapse;min-width:650px;font-size:13px}
+    .traceTable th,.traceTable td{padding:8px 9px;border-bottom:1px solid #203c5b;text-align:center;white-space:nowrap}
+    .traceTable th{position:sticky;top:0;background:#0d2037;z-index:1}
+    .tagB{color:#ff5b68;font-weight:800}.tagP{color:#5d98ff;font-weight:800}.tagT{color:#37d87b;font-weight:800}
+    .roadMarkR{color:#ff5b68;font-weight:800}.roadMarkU{color:#5d98ff;font-weight:800}.roadDash{color:#7890aa}
 </style>
 </head>
 <body>
@@ -77,6 +85,21 @@ textarea{width:100%;background:#071525;color:#fff;border:1px solid var(--line);b
         <div class="verifyBox"><span class="muted">座標校準</span><b id="verifyGrid">等待圖片</b></div>
       </div>
       <p class="muted" id="verifyInfo">辨識流程：先找珠盤路 → 重建大路 → 依標準衍生路規則重新計算三路。下三路紅／藍代表規律／不規律，不代表莊／閒。</p>
+    </section>
+
+    <section class="panel">
+      <h2>珠盤唯一來源・逐手校驗</h2>
+      <div class="cards">
+        <div><span>辨識局數</span><b id="sourceHands">0</b></div>
+        <div><span>大路格數</span><b id="sourceBig">0</b></div>
+        <div><span>大眼／小／曱甴</span><b id="sourceDerived">0 / 0 / 0</b></div>
+        <div><span>來源模式</span><b id="sourceMode">珠盤 ONLY</b></div>
+      </div>
+      <h3>辨識 B/P/T 序列</h3>
+      <div id="sourceSequence" class="sourceSeq">尚未辨識圖片</div>
+      <p class="muted">這串 B/P/T 是唯一資料來源。大路與下三路不從圖片直接 OCR，而是全部由此序列重新演算。</p>
+      <h3>逐手衍生追蹤</h3>
+      <div class="traceWrap"><table class="traceTable"><thead><tr><th>手</th><th>珠盤</th><th>大路座標</th><th>大眼仔</th><th>小路</th><th>曱甴路</th></tr></thead><tbody id="traceBody"><tr><td colspan="6">等待辨識</td></tr></tbody></table></div>
     </section>
 
     <section class="panel">
@@ -299,7 +322,21 @@ var Roads=(function(){
     function same(a,b){return a.length===b.length&&a.every(function(x,i){return x===b[i];});}
     return{big:b.length===bp,eye:same(derivedSignals(b,1),referenceSignals(b,1)),small:same(derivedSignals(b,2),referenceSignals(b,2)),cock:same(derivedSignals(b,3),referenceSignals(b,3))};
   }
-  return{data:data,render:render,big:big,validate:validate};
+  // Per-hand audit trail. For every raw bead result, show where the Big Road landed
+  // and whether that hand produced a new derived-road marker. Ties never create a new Big Road cell.
+  function trace(seq){
+    var rows=[],prevBig=0,prevE=0,prevS=0,prevC=0;
+    for(var i=0;i<seq.length;i++){
+      var partial=seq.slice(0,i+1),d=data(partial),cell=null;
+      if(d.big.length>prevBig)cell=d.big[d.big.length-1];
+      var er=derivedSignals(d.big,1),sr=derivedSignals(d.big,2),cr=derivedSignals(d.big,3);
+      rows.push({hand:i+1,result:seq[i],big:cell?('R'+(cell.row+1)+' C'+(cell.col+1)):(seq[i]==='T'?'和局附著':'—'),eye:er.length>prevE?er[er.length-1]:null,small:sr.length>prevS?sr[sr.length-1]:null,cock:cr.length>prevC?cr[cr.length-1]:null});
+      prevBig=d.big.length;prevE=er.length;prevS=sr.length;prevC=cr.length;
+    }
+    return rows;
+  }
+  function signals(seq){var b=big(seq);return{eye:derivedSignals(b,1),small:derivedSignals(b,2),cock:derivedSignals(b,3)};}
+  return{data:data,render:render,big:big,validate:validate,trace:trace,signals:signals};
 })();
 
 
@@ -474,7 +511,18 @@ var Recognizer=(function(){
 (function(){
   function $(id){return document.getElementById(id);}function toast(msg){var e=$('toast');e.textContent=msg;e.className='toast show';clearTimeout(toast.t);toast.t=setTimeout(function(){e.className='toast';},1700);}var state=Store.load(),replayTimer=null;
   function setVerify(id,text,kind){var e=$(id);if(!e)return;e.textContent=text;e.className=kind||'';}
-  function updateVerification(seqData,ocr){var v=Roads.validate(seqData||[]);setVerify('verifyBig',v.big?'通過':'異常',v.big?'ok':'bad');setVerify('verifyEye',v.eye?'標準規則通過':'規則異常',v.eye?'ok':'bad');setVerify('verifySmall',v.small?'標準規則通過':'規則異常',v.small?'ok':'bad');setVerify('verifyCock',v.cock?'標準規則通過':'規則異常',v.cock?'ok':'bad');if(ocr){setVerify('verifyOcr',ocr.confidence+'%',ocr.confidence>=55?'ok':ocr.confidence>=35?'warn':'bad');setVerify('verifyGrid','x '+ocr.x0+' / y '+ocr.y0+' / 格 '+ocr.cell,'ok');$('verifyInfo').textContent='辨識 '+ocr.count+' 局；珠盤重建大路 '+(ocr.roadOK?'一致':'不一致')+'。匯入前仍建議核對總局數。';}}
+  function mark(v){if(!v)return '<span class="roadDash">—</span>';return '<span class="'+(v==='B'?'roadMarkR':'roadMarkU')+'">'+(v==='B'?'紅':'藍')+'</span>';}
+  function renderSourceAudit(seqData){
+    seqData=seqData||[];var d=Roads.data(seqData),sg=Roads.signals(seqData),tr=Roads.trace(seqData);
+    if($('sourceHands'))$('sourceHands').textContent=seqData.length;
+    if($('sourceBig'))$('sourceBig').textContent=d.big.length;
+    if($('sourceDerived'))$('sourceDerived').textContent=sg.eye.length+' / '+sg.small.length+' / '+sg.cock.length;
+    if($('sourceSequence'))$('sourceSequence').textContent=seqData.length?seqData.join(''):'尚未辨識圖片';
+    var tb=$('traceBody');if(!tb)return;tb.innerHTML='';
+    if(!tr.length){tb.innerHTML='<tr><td colspan="6">等待辨識</td></tr>';return;}
+    tr.slice(-60).forEach(function(x){var c=x.result==='B'?'tagB':x.result==='P'?'tagP':'tagT';var row=document.createElement('tr');row.innerHTML='<td>'+x.hand+'</td><td class="'+c+'">'+x.result+'</td><td>'+x.big+'</td><td>'+mark(x.eye)+'</td><td>'+mark(x.small)+'</td><td>'+mark(x.cock)+'</td>';tb.appendChild(row);});
+  }
+  function updateVerification(seqData,ocr){var v=Roads.validate(seqData||[]);setVerify('verifyBig',v.big?'通過':'異常',v.big?'ok':'bad');setVerify('verifyEye',v.eye?'標準規則通過':'規則異常',v.eye?'ok':'bad');setVerify('verifySmall',v.small?'標準規則通過':'規則異常',v.small?'ok':'bad');setVerify('verifyCock',v.cock?'標準規則通過':'規則異常',v.cock?'ok':'bad');renderSourceAudit(seqData||[]);if(ocr){setVerify('verifyOcr',ocr.confidence+'%',ocr.confidence>=55?'ok':ocr.confidence>=35?'warn':'bad');setVerify('verifyGrid','x '+ocr.x0+' / y '+ocr.y0+' / 格 '+ocr.cell,'ok');$('verifyInfo').textContent='辨識 '+ocr.count+' 局；珠盤為唯一來源；大路與下三路全部由 B/P/T 重新演算。 '+(ocr.roadOK?'內部校驗通過':'內部校驗異常')+'。';}}
 
   function save(){Store.save(state);render();}function analyze(){return AI.analyze(state.current,state.learning,state.ledger);}function add(actual){var before=analyze();state.current.push(actual);state.ledger.push({at:new Date().toISOString(),actual:actual,call:before.call,confidence:before.confidence,banker:before.banker.toFixed(1),player:before.player.toFixed(1),factors:before.factors});if(actual==='B'||actual==='P')state.learning=Learning.update(state.learning,before.factors,actual,before.call);save();}
   document.querySelectorAll('[data-result]').forEach(function(btn){btn.onclick=function(){add(btn.getAttribute('data-result'));};});
