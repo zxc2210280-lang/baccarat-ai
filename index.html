@@ -4,53 +4,556 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V23 STABLE</title>
+<title>AI PRO V26 CLOUD LEARNING</title>
 <style>
-:root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--warn:#ffd166}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:900px;margin:auto;padding:18px}.hero{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.hero h1{margin:0;font-size:28px}.muted{color:var(--muted)}.badge{border:1px solid var(--line);background:#10243c;border-radius:999px;padding:9px 12px;text-align:center}.panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:18px;margin:16px 0}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}button,.fileBtn{min-height:54px;border:1px solid var(--line);border-radius:15px;background:#14243a;color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;padding:10px}.b{background:var(--red)}.p{background:var(--blue)}.t{background:var(--green)}.fileBtn input{display:none}.danger{color:#ff7d88}.preview{width:100%;max-height:560px;object-fit:contain;border-radius:14px;background:#06101c;margin:10px 0}.row{display:flex;gap:10px;margin-top:10px}.row>*{flex:1}textarea{width:100%;min-height:88px;border:1px solid var(--line);border-radius:14px;background:#071525;color:#fff;padding:12px;font-size:16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.notice{padding:12px;border-radius:12px;background:#0a1728;border:1px solid var(--line);margin-top:10px}.ok{color:var(--green)}.warn{color:var(--warn)}.bad{color:var(--red)}.road{display:grid;grid-auto-flow:column;grid-template-rows:repeat(6,34px);grid-auto-columns:34px;min-height:210px;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:8px;background:#071525;justify-content:start}.dot{width:28px;height:28px;border-radius:50%;margin:3px;border:3px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}.dot.fill{color:#fff}.dot.B{color:var(--red)}.dot.P{color:var(--blue)}.dot.T{color:var(--green)}.dot.fill.B{background:var(--red)}.dot.fill.P{background:var(--blue)}.dot.fill.T{background:var(--green)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}.stats b{display:block;font-size:26px}.call{margin:12px auto 0;max-width:260px;text-align:center;padding:14px;border-radius:14px;background:#53627a;font-size:24px;font-weight:900}.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#101a28;padding:11px 16px;border-radius:12px;opacity:0;transition:.2s;z-index:99}.toast.show{opacity:1}@media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}}
+:root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:auto;padding:16px}
+.hero{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.hero h1{margin:0;font-size:28px}.muted{color:var(--muted)}.badge{border:1px solid var(--line);background:#10243c;border-radius:999px;padding:8px 11px;text-align:center}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+button,.fileBtn{min-height:52px;border:1px solid var(--line);border-radius:14px;background:#14243a;color:white;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;padding:10px}
+button:active,.fileBtn:active{transform:scale(.98)} .fileBtn input{display:none}
+.b{background:var(--red)}.p{background:var(--blue)}.t{background:var(--green)}.danger{color:#ff7d88}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card{background:#0a1728;border:1px solid var(--line);border-radius:14px;padding:12px}
+.card b{font-size:20px;display:block;margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:8px}
+.stats b{display:block;font-size:28px}.call{margin:12px auto 0;max-width:260px;text-align:center;padding:14px;border-radius:14px;background:var(--gray);font-size:24px;font-weight:900}
+.road{display:grid;grid-auto-flow:column;grid-template-rows:repeat(6,34px);grid-auto-columns:34px;min-height:210px;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:8px;background:#071525;justify-content:start}
+.dot{width:28px;height:28px;border-radius:50%;margin:3px;border:3px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
+.dot.fill{color:white}.dot.B{color:var(--red)}.dot.P{color:var(--blue)}.dot.T{color:var(--green)}.dot.fill.B{background:var(--red)}.dot.fill.P{background:var(--blue)}.dot.fill.T{background:var(--green)}
+.factor{background:#0a1728;border:1px solid var(--line);border-radius:12px;padding:10px;margin:7px 0}.factorTop{display:flex;justify-content:space-between;gap:8px}.bar{height:8px;background:#22344d;border-radius:999px;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;background:var(--gold)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;border-bottom:1px solid #203c5b;text-align:center}th{position:sticky;top:0;background:#0d2037}.tableWrap{overflow:auto;max-height:360px;border:1px solid var(--line);border-radius:12px}
+input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(--line);color:white;border-radius:12px;padding:11px;font-size:15px}textarea{min-height:92px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#101a28;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-index:99}.toast.show{opacity:1}
+.small{font-size:12px}.ok{color:var(--green)}.warn{color:#ffd166}
+@media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}.cards{grid-template-columns:repeat(4,1fr)}}
 </style>
 </head>
-<body><main class="wrap">
-<header class="hero"><div><h1>AI PRO V23 STABLE</h1><p class="muted">inja777・手動輸入優先・截圖辨識先確認再匯入</p></div><div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V23</div></div></header>
-<section class="panel"><h2>本鞋輸入</h2><div class="grid">
-<button class="b" data-r="B">B 莊</button><button class="p" data-r="P">P 閒</button><button class="t" data-r="T">T 和</button><button id="undo">復原</button>
-<label class="fileBtn">選擇截圖<input id="file" type="file" accept="image/*"></label><button id="recognize">重新辨識</button><button id="newShoe">封存／新鞋</button><button id="clear" class="danger">清除本鞋</button>
-</div>
-<p class="muted">截圖辨識不會直接覆蓋本鞋。先核對下方 B/P/T，再按「確認序列並匯入」。六列定位失敗也不會把程式鎖死。</p>
-<img id="preview" class="preview" alt=""><canvas id="cv" class="preview" hidden></canvas>
-<textarea id="seq" placeholder="辨識後會出現在這裡；可直接手動修正 B/P/T"></textarea>
-<div class="row"><button id="confirm">確認序列並匯入</button><button id="append">接續目前鞋</button></div>
-<div id="ocrStatus" class="notice">尚未載入圖片。</div>
+<body>
+<main class="wrap">
+<header class="hero">
+  <div>
+    <h1>AI PRO V26 CLOUD LEARNING</h1>
+    <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
+  </div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V26 CLOUD</div></div>
+</header>
+
+<section class="panel">
+  <h2>本鞋輸入</h2>
+  <div class="grid">
+    <button class="b" data-r="B">B 莊</button>
+    <button class="p" data-r="P">P 閒</button>
+    <button class="t" data-r="T">T 和</button>
+    <button id="undo">復原</button>
+    <button id="newShoe">封存／新鞋</button>
+    <button id="replay">逐局回放</button>
+    <button id="exportBtn">匯出 JSON</button>
+    <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
+  </div>
+  <p class="muted">V25 FINAL：逐局 B/P/T 與整串手動序列都可用。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
 </section>
-<section class="panel"><h2>目前分析</h2><div class="stats"><div><b id="bPct">50.0%</b><span class="muted">莊傾向</span></div><div><b id="conf">0%</b><span class="muted">信心</span></div><div><b id="pPct">50.0%</b><span class="muted">閒傾向</span></div></div><div id="call" class="call">PASS</div><p class="muted">僅為路單統計分析，不代表下一局可被確定預測。</p></section>
-<section class="panel"><h2>路單</h2><h3>珠盤路</h3><div id="bead" class="road"></div><h3>大路</h3><div id="big" class="road"></div><h3>大眼仔路</h3><div id="eye" class="road"></div><h3>小路</h3><div id="small" class="road"></div><h3>曱甴路</h3><div id="cock" class="road"></div></section>
-</main><div id="toast" class="toast"></div>
+
+<section class="panel">
+  <h2>手動序列輸入</h2>
+  <p class="muted">可直接貼上整串 B / P / T，例如：<b>BPPBTTPBBP</b>。空白、逗號、換行會自動忽略。</p>
+  <textarea id="manualSeq" placeholder="例如：BPPBTTPBBP"></textarea>
+  <div class="grid" style="margin-top:10px">
+    <button id="replaceSeq">取代目前鞋</button>
+    <button id="appendSeq">接續目前鞋</button>
+    <button id="clearSeq">清空輸入框</button>
+  </div>
+  <p id="manualSeqInfo" class="muted">尚未輸入序列。</p>
+</section>
+
+<section class="panel">
+  <h2>目前分析</h2>
+  <div class="stats">
+    <div><b id="bPct">50.0%</b><span class="muted">莊傾向</span></div>
+    <div><b id="conf">0%</b><span class="muted">信心</span></div>
+    <div><b id="pPct">50.0%</b><span class="muted">閒傾向</span></div>
+  </div>
+  <div id="call" class="call">PASS</div>
+  <div class="cards" style="margin-top:12px">
+    <div class="card"><span class="muted">目前局數</span><b id="hands">0</b></div>
+    <div class="card"><span class="muted">莊／閒／和</span><b id="bpt">0 / 0 / 0</b></div>
+    <div class="card"><span class="muted">相似樣本</span><b id="similar">0</b></div>
+    <div class="card"><span class="muted">歷史命中率</span><b id="acc">尚無資料</b></div>
+  </div>
+  <p id="reason" class="muted"></p>
+</section>
+
+<section class="panel">
+  <h2>自適應學習權重</h2>
+  <div id="factorBox"></div>
+  <p class="muted small">權重由永久歷史表現更新。樣本不足時會回到保守權重，避免短期資料把模型帶偏。</p>
+</section>
+
+<section class="panel">
+  <h2>永久資料庫</h2>
+  <div class="cards">
+    <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
+    <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
+    <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V26</b></div>
+  </div>
+  <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
+</section>
+
+<section class="panel">
+  <h2>AI 雲端資料庫</h2>
+  <p class="muted">本機 IndexedDB 仍是第一層保護；連接 Supabase 後，可把鞋、學習紀錄與權重同步到雲端。換手機後可從雲端還原。</p>
+  <div class="cards">
+    <div class="card"><span class="muted">雲端狀態</span><b id="cloudStatus">未設定</b></div>
+    <div class="card"><span class="muted">最後同步</span><b id="cloudLastSync">—</b></div>
+    <div class="card"><span class="muted">本機鞋數</span><b id="cloudLocalShoes">0</b></div>
+    <div class="card"><span class="muted">本機學習紀錄</span><b id="cloudLocalHands">0</b></div>
+  </div>
+  <div style="margin-top:12px"><input id="supabaseUrl" type="text" placeholder="Supabase Project URL"></div>
+  <div style="margin-top:10px"><input id="supabaseKey" type="text" placeholder="Supabase anon public key"></div>
+  <div style="margin-top:10px"><input id="cloudUserId" type="text" placeholder="雲端資料識別碼，例如：my-ai-pro"></div>
+  <div class="grid" style="margin-top:10px">
+    <button id="saveCloudConfig">儲存雲端設定</button>
+    <button id="pushCloud">同步到雲端</button>
+    <button id="pullCloud">從雲端還原</button>
+    <button id="clearCloudConfig" class="danger">清除雲端設定</button>
+  </div>
+  <p id="cloudInfo" class="muted small">第一次使用需先建立 Supabase 專案並執行 ZIP 內的 SUPABASE_SETUP.sql。</p>
+</section>
+
+<section class="panel">
+  <h2>路單</h2>
+  <h3>珠盤路</h3><div id="bead" class="road"></div>
+  <h3>大路</h3><div id="big" class="road"></div>
+  <h3>大眼仔路</h3><div id="eye" class="road"></div>
+  <h3>小路</h3><div id="small" class="road"></div>
+  <h3>曱甴路</h3><div id="cock" class="road"></div>
+</section>
+
+<section class="panel">
+  <h2>最近學習紀錄</h2>
+  <div class="tableWrap">
+    <table>
+      <thead><tr><th>時間</th><th>鞋</th><th>局</th><th>AI</th><th>實際</th><th>結果</th><th>信心</th></tr></thead>
+      <tbody id="historyRows"><tr><td colspan="7">尚無紀錄</td></tr></tbody>
+    </table>
+  </div>
+</section>
+</main>
+<div id="toast" class="toast"></div>
+
 <script>
 (function(){
 'use strict';
-var $=function(id){return document.getElementById(id)},KEY='AI_PRO_V23_STATE';
-var state={current:[]};try{var saved=JSON.parse(localStorage.getItem(KEY)||'{}');if(Array.isArray(saved.current))state.current=saved.current;}catch(e){}
-function clean(s){return(s||[]).filter(function(x){return x==='B'||x==='P'||x==='T';});}
-function save(){localStorage.setItem(KEY,JSON.stringify(state));render();}
-function toast(s){$('toast').textContent=s;$('toast').classList.add('show');setTimeout(function(){$('toast').classList.remove('show');},1800)}
-var Roads=(function(){
-function bead(seq){return seq.map(function(x,i){return{result:x,row:i%6,col:Math.floor(i/6),fill:true,ties:0};});}
-function big(seq){var out=[],occ={},current=null,runStartCol=0,pendingTies=0;seq.forEach(function(x){if(x==='T'){if(current)current.ties=(current.ties||0)+1;else pendingTies++;return;}if(!current){current={result:x,row:0,col:0,ties:pendingTies};pendingTies=0;runStartCol=0;out.push(current);occ['0,0']=current;return;}var row,col;if(x===current.result){if(current.row<5&&!occ[(current.row+1)+','+current.col]){row=current.row+1;col=current.col;}else{row=current.row;col=current.col+1;while(occ[row+','+col])col++;}}else{row=0;col=runStartCol+1;while(occ[row+','+col])col++;runStartCol=col;}current={result:x,row:row,col:col,ties:0};out.push(current);occ[row+','+col]=current;});return out;}
-function heights(c){var h={};c.forEach(function(x){h[x.col]=Math.max(h[x.col]||0,x.row+1)});return h}function occ(c){var o={};c.forEach(function(x){o[x.row+','+x.col]=1});return o}
-function sig(c,off){var s=[],h=heights(c),o=occ(c);c.forEach(function(x){var enough=x.row===0?x.col>=off+1:x.col>=off;if(!enough)return;var red;if(x.row===0){red=(h[x.col-1]||0)===(h[x.col-1-off]||0);}else{red=(!!o[x.row+','+(x.col-off)])===(!!o[(x.row-1)+','+(x.col-off)]);}s.push(red?'B':'P');});return s;}
-function marker(s){var cells=[],o={},cur=null,run=0;s.forEach(function(x){if(!cur){cur={result:x,row:0,col:0,fill:true};cells.push(cur);o['0,0']=1;return;}var r,c;if(x===cur.result){if(cur.row<5&&!o[(cur.row+1)+','+cur.col]){r=cur.row+1;c=cur.col}else{r=cur.row;c=cur.col+1;while(o[r+','+c])c++;}}else{r=0;c=run+1;while(o[r+','+c])c++;run=c;}cur={result:x,row:r,col:c,fill:true};cells.push(cur);o[r+','+c]=1;});return cells;}
-function data(seq){var b=big(seq);return{bead:bead(seq),big:b,eye:marker(sig(b,1)),small:marker(sig(b,2)),cock:marker(sig(b,3))};}
-function draw(id,cells,fill){var el=$(id);el.innerHTML='';cells.forEach(function(c){var d=document.createElement('div');d.className='dot '+c.result+(fill||c.fill?' fill':'');if(id==='bead')d.textContent=c.result;else if(id==='big'&&c.ties)d.textContent='T'+c.ties;d.style.gridRow=c.row+1;d.style.gridColumn=c.col+1;el.appendChild(d);});}
-function render(seq){var d=data(seq);draw('bead',d.bead,true);draw('big',d.big,false);draw('eye',d.eye,true);draw('small',d.small,true);draw('cock',d.cock,true);}return{render:render};})();
-function analyze(seq){var a=seq.filter(function(x){return x!=='T'});if(a.length<6)return{b:50,p:50,c:0,call:'PASS'};var last=a[a.length-1],st=0;for(var i=a.length-1;i>=0&&a[i]===last;i--)st++;var recent=a.slice(-10),b=recent.filter(function(x){return x==='B'}).length,p=recent.length-b,score=(b-p)*2+(last==='B'?1:-1)*Math.min(5,st);var bp=Math.max(40,Math.min(60,50+score));var conf=Math.min(85,Math.round(Math.abs(bp-50)*6+a.length/3));var call=(conf>=55&&Math.abs(bp-50)>=6)?(bp>50?'B':'P'):'PASS';return{b:bp,p:100-bp,c:conf,call:call};}
-function render(){Roads.render(state.current);var a=analyze(state.current);$('bPct').textContent=a.b.toFixed(1)+'%';$('pPct').textContent=a.p.toFixed(1)+'%';$('conf').textContent=a.c+'%';$('call').textContent=a.call==='B'?'B 莊':a.call==='P'?'P 閒':'PASS';$('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':'#53627a';}
-document.querySelectorAll('[data-r]').forEach(function(b){b.onclick=function(){state.current.push(this.dataset.r);save();}});$('undo').onclick=function(){state.current.pop();save()};$('clear').onclick=function(){if(confirm('確定清除本鞋？')){state.current=[];save()}};$('newShoe').onclick=function(){state.current=[];save();toast('已開始新鞋')};
-var imgObj=null,lastCandidate=[];
-function classify(r,g,b){var mx=Math.max(r,g,b),mn=Math.min(r,g,b);if(mx<60||mx-mn<25)return null;if(r>105&&r>g*1.08&&r>b*1.06)return'B';if(b>92&&b>r*1.03&&b>=g*.84)return'P';if(g>82&&g>r*1.03&&g>b*.88)return'T';return null;}
-function recognize(){if(!imgObj)throw new Error('請先選擇截圖');var w=imgObj.naturalWidth,h=imgObj.naturalHeight,c=$('cv');c.width=w;c.height=h;var g=c.getContext('2d');g.drawImage(imgObj,0,0,w,h);var im=g.getImageData(0,0,w,h).data;function rgb(x,y){x=Math.max(0,Math.min(w-1,Math.round(x)));y=Math.max(0,Math.min(h-1,Math.round(y)));var k=(y*w+x)*4;return[im[k],im[k+1],im[k+2]]}function vote(cx,cy,dx,dy){var n={B:0,P:0,T:0},tot=0;[.5,.72,.92].forEach(function(rr){var rad=Math.min(dx,dy)*.36*rr;for(var k=0;k<20;k++){var a=Math.PI*2*k/20,v=rgb(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad),z=classify(v[0],v[1],v[2]);tot++;if(z)n[z]++;}});var r='B';if(n.P>n[r])r='P';if(n.T>n[r])r='T';return n[r]>=7?{r:r,c:n[r]/tot}:null;}
-var profiles=[{x:.028,y:.676,dx:.046,dy:.0218},{x:.032,y:.684,dx:.046,dy:.0218},{x:.036,y:.692,dx:.0455,dy:.022},{x:.030,y:.700,dx:.0455,dy:.022}];var best=null;profiles.forEach(function(p){[-.04,0,.04].forEach(function(sf){for(var ox=-5;ox<=5;ox++)for(var oy=-7;oy<=7;oy++){var dx=p.dx*w*(1+sf),dy=p.dy*h*(1+sf),x0=p.x*w+ox*dx*.08,y0=p.y*h+oy*dy*.08,seq=[],conf=0,holes=0;for(var col=0;col<16;col++){var vals=[];for(var row=0;row<6;row++)vals.push(vote(x0+col*dx,y0+row*dy,dx,dy));var pref=0;while(pref<6&&vals[pref])pref++;if(pref===0){if(seq.length)break;continue;}for(var q=pref;q<6;q++)if(vals[q])holes++;for(var row=0;row<pref;row++){seq.push(vals[row].r);conf+=vals[row].c;}if(pref<6)break;}if(seq.length<6)return;var cnt={B:0,P:0,T:0};seq.forEach(function(v){cnt[v]++});var maj=Math.max(cnt.B,cnt.P,cnt.T)/seq.length,unique=(cnt.B?1:0)+(cnt.P?1:0)+(cnt.T?1:0),score=seq.length*180+(conf/seq.length)*2200-holes*700+(unique>=2?500:0)+(unique===3?250:0)-(maj>.96?2500:0);if(!best||score>best.score)best={seq:seq,score:score,c:conf/seq.length,holes:holes};}})});if(!best)throw new Error('沒有找到可靠珠盤；可直接手動修正序列後匯入');lastCandidate=best.seq.slice();$('seq').value=best.seq.join('');var cnt={B:0,P:0,T:0};best.seq.forEach(function(v){cnt[v]++});$('ocrStatus').innerHTML='<span class="'+(best.holes?'warn':'ok')+'">已抓到 '+best.seq.length+' 局｜莊 '+cnt.B+'｜閒 '+cnt.P+'｜和 '+cnt.T+'｜信心 '+Math.round(best.c*100)+'%</span><br><span class="muted">請先核對 B/P/T；即使定位不完整也可手動修正後匯入。</span>';return best;}
-$('file').onchange=function(){var f=this.files&&this.files[0];if(!f)return;var u=URL.createObjectURL(f),im=new Image();im.onload=function(){imgObj=im;$('preview').src=u;$('preview').style.display='block';try{recognize();}catch(e){$('ocrStatus').innerHTML='<span class="warn">'+e.message+'</span><br><span class="muted">程式不會鎖死；可在上方直接輸入/修正 B/P/T 後按確認。</span>';}};im.src=u;this.value='';};$('recognize').onclick=function(){try{recognize()}catch(e){$('ocrStatus').innerHTML='<span class="warn">'+e.message+'</span>'}};
-function seqBox(){return clean(($('seq').value.toUpperCase().match(/[BPT]/g)||[]));}$('confirm').onclick=function(){var s=seqBox();if(s.length<1)return toast('沒有序列');state.current=s;save();$('ocrStatus').innerHTML='<span class="ok">已匯入 '+s.length+' 局，五路已重建。</span>';toast('已確認並匯入')};$('append').onclick=function(){var s=seqBox();if(!s.length)return toast('沒有序列');state.current=state.current.concat(s);save();toast('已接續目前鞋')};
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')localStorage.setItem(KEY,JSON.stringify(state));});window.addEventListener('pagehide',function(){localStorage.setItem(KEY,JSON.stringify(state));});render();
+var $=function(id){return document.getElementById(id)};
+var DB_NAME='AI_PRO_V26_DB', DB_VERSION=1, db=null;
+var state={shoeId:null,current:[],pendingPrediction:null};
+
+var FACTORS=[
+ {id:'recentBias',name:'最近10局偏向',base:1.00},
+ {id:'streak',name:'連莊／連閒延續',base:.90},
+ {id:'alternation',name:'單跳／交替',base:.80},
+ {id:'bigRoad',name:'大路結構',base:1.10},
+ {id:'eye',name:'大眼仔',base:.85},
+ {id:'small',name:'小路',base:.80},
+ {id:'cock',name:'曱甴路',base:.75},
+ {id:'similar',name:'歷史相似局面',base:1.25}
+];
+var learned={};
+
+function toast(s){$('toast').textContent=s;$('toast').classList.add('show');setTimeout(function(){$('toast').classList.remove('show')},1500)}
+function nowIso(){return new Date().toISOString()}
+function newShoeId(){return 'S'+Date.now()}
+function tx(store,mode){return db.transaction(store,mode).objectStore(store)}
+function reqP(req){return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)})}
+function allP(store){return reqP(tx(store,'readonly').getAll())}
+
+function openDB(){
+ return new Promise((res,rej)=>{
+  var r=indexedDB.open(DB_NAME,DB_VERSION);
+  r.onupgradeneeded=function(e){
+   var d=e.target.result;
+   if(!d.objectStoreNames.contains('hands')){
+    var s=d.createObjectStore('hands',{keyPath:'id',autoIncrement:true});
+    s.createIndex('shoeId','shoeId',{unique:false});
+    s.createIndex('signature','signature',{unique:false});
+   }
+   if(!d.objectStoreNames.contains('shoes')) d.createObjectStore('shoes',{keyPath:'shoeId'});
+   if(!d.objectStoreNames.contains('factorStats')) d.createObjectStore('factorStats',{keyPath:'factorId'});
+   if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta',{keyPath:'key'});
+  };
+  r.onsuccess=()=>{db=r.result;res(db)};
+  r.onerror=()=>rej(r.error);
+ });
+}
+
+function bead(seq){return seq.map((x,i)=>({result:x,row:i%6,col:Math.floor(i/6),fill:true,ties:0}))}
+function big(seq){
+ var out=[],occ={},current=null,runStartCol=0,pendingTies=0;
+ seq.forEach(function(x){
+  if(x==='T'){if(current)current.ties=(current.ties||0)+1;else pendingTies++;return}
+  if(!current){current={result:x,row:0,col:0,ties:pendingTies};pendingTies=0;runStartCol=0;out.push(current);occ['0,0']=1;return}
+  var row,col;
+  if(x===current.result){
+   if(current.row<5&&!occ[(current.row+1)+','+current.col]){row=current.row+1;col=current.col}
+   else{row=current.row;col=current.col+1;while(occ[row+','+col])col++}
+  }else{
+   row=0;col=runStartCol+1;while(occ[row+','+col])col++;runStartCol=col
+  }
+  current={result:x,row:row,col:col,ties:0};out.push(current);occ[row+','+col]=1
+ });
+ return out;
+}
+function heights(c){var h={};c.forEach(x=>h[x.col]=Math.max(h[x.col]||0,x.row+1));return h}
+function occMap(c){var o={};c.forEach(x=>o[x.row+','+x.col]=1);return o}
+function signals(c,off){
+ var s=[],h=heights(c),o=occMap(c);
+ c.forEach(function(x){
+  var enough=x.row===0?x.col>=off+1:x.col>=off;if(!enough)return;
+  var red;
+  if(x.row===0) red=(h[x.col-1]||0)===(h[x.col-1-off]||0);
+  else red=(!!o[x.row+','+(x.col-off)])===(!!o[(x.row-1)+','+(x.col-off)]);
+  s.push(red?'B':'P');
+ });
+ return s;
+}
+function marker(s){
+ var cells=[],o={},cur=null,run=0;
+ s.forEach(function(x){
+  if(!cur){cur={result:x,row:0,col:0,fill:true};cells.push(cur);o['0,0']=1;return}
+  var r,c;
+  if(x===cur.result){
+   if(cur.row<5&&!o[(cur.row+1)+','+cur.col]){r=cur.row+1;c=cur.col}
+   else{r=cur.row;c=cur.col+1;while(o[r+','+c])c++}
+  }else{r=0;c=run+1;while(o[r+','+c])c++;run=c}
+  cur={result:x,row:r,col:c,fill:true};cells.push(cur);o[r+','+c]=1;
+ });
+ return cells;
+}
+function roadData(seq){var b=big(seq);return{bead:bead(seq),big:b,eye:marker(signals(b,1)),small:marker(signals(b,2)),cock:marker(signals(b,3))}}
+function drawRoad(id,cells,fill){
+ var el=$(id);el.innerHTML='';
+ cells.forEach(function(c){
+  var d=document.createElement('div');d.className='dot '+c.result+(fill||c.fill?' fill':'');
+  if(id==='bead')d.textContent=c.result;else if(id==='big'&&c.ties)d.textContent='T'+c.ties;
+  d.style.gridRow=c.row+1;d.style.gridColumn=c.col+1;el.appendChild(d);
+ });
+}
+
+function streakInfo(a){
+ if(!a.length)return{last:null,len:0};
+ var last=a[a.length-1],len=0;for(var i=a.length-1;i>=0&&a[i]===last;i--)len++;
+ return{last:last,len:len};
+}
+function altScore(a){
+ if(a.length<5)return 0;
+ var n=a.slice(-6),changes=0;for(var i=1;i<n.length;i++)if(n[i]!==n[i-1])changes++;
+ return changes/(n.length-1);
+}
+function tailPattern(seq,n){return seq.filter(x=>x!=='T').slice(-n).join('')}
+function signature(seq){
+ var a=seq.filter(x=>x!=='T'),rd=roadData(seq),st=streakInfo(a);
+ var e=rd.eye.slice(-4).map(x=>x.result).join('');
+ var s=rd.small.slice(-4).map(x=>x.result).join('');
+ var c=rd.cock.slice(-4).map(x=>x.result).join('');
+ return [tailPattern(seq,6),st.len>=4?'L4+':'L'+st.len,e,s,c].join('|');
+}
+
+async function loadFactorStats(){
+ var rows=await allP('factorStats');learned={};
+ FACTORS.forEach(f=>learned[f.id]={wins:0,losses:0,samples:0,weight:f.base});
+ rows.forEach(r=>{learned[r.factorId]=r});
+}
+function factorWeight(id){
+ var x=learned[id]||{samples:0,wins:0,losses:0,weight:1};
+ if(x.samples<20)return FACTORS.find(f=>f.id===id).base;
+ var rate=(x.wins+5)/(x.samples+10);
+ return Math.max(.45,Math.min(1.75,0.55+rate*1.5));
+}
+async function similarStats(sig){
+ var all=await allP('hands');
+ var m=all.filter(x=>x.signature===sig && (x.actual==='B'||x.actual==='P'));
+ var b=m.filter(x=>x.actual==='B').length,p=m.filter(x=>x.actual==='P').length;
+ return{samples:m.length,b:b,p:p,bRate:m.length?b/m.length:.5};
+}
+function factorSignals(seq,sim){
+ var a=seq.filter(x=>x!=='T'),rd=roadData(seq),st=streakInfo(a),alt=altScore(a);
+ var recent=a.slice(-10),rb=recent.filter(x=>x==='B').length,rp=recent.length-rb;
+ function lastRoad(arr){return arr.length?arr[arr.length-1].result:null}
+ return{
+  recentBias:(rb-rp)/Math.max(1,recent.length),
+  streak:st.last?(st.last==='B'?1:-1)*Math.min(1,st.len/4):0,
+  alternation:alt>.75?(a.length&&a[a.length-1]==='B'?-0.7:0.7):0,
+  bigRoad:st.last?(st.last==='B'?0.45:-0.45):0,
+  eye:lastRoad(rd.eye)==='B'?.35:lastRoad(rd.eye)==='P'?-.35:0,
+  small:lastRoad(rd.small)==='B'?.30:lastRoad(rd.small)==='P'?-.30:0,
+  cock:lastRoad(rd.cock)==='B'?.25:lastRoad(rd.cock)==='P'?-.25:0,
+  similar:sim.samples>=8?(sim.bRate-.5)*2:0
+ };
+}
+async function analyze(seq){
+ if(seq.filter(x=>x!=='T').length<6)return{b:50,p:50,c:0,call:'PASS',sim:{samples:0},factors:{}};
+ var sig=signature(seq),sim=await similarStats(sig),fs=factorSignals(seq,sim),score=0,details=[];
+ FACTORS.forEach(function(f){
+  var w=factorWeight(f.id),v=fs[f.id]||0;score+=w*v;details.push({id:f.id,name:f.name,w:w,v:v,impact:w*v});
+ });
+ var b=50+Math.max(-12,Math.min(12,score*6)),c=Math.min(88,Math.round(Math.abs(b-50)*5 + Math.min(25,sim.samples/2)));
+ var call=(c>=55&&Math.abs(b-50)>=5.5)?(b>50?'B':'P'):'PASS';
+ return{b:b,p:100-b,c:c,call:call,sim:sim,factors:details,signature:sig};
+}
+async function updateLearning(record,actual){
+ if(!record||record.call==='PASS'||!(actual==='B'||actual==='P'))return;
+ var hit=record.call===actual;
+ for(var i=0;i<record.factors.length;i++){
+  var f=record.factors[i]; if(Math.abs(f.v)<.05)continue;
+  var expected=f.impact>0?'B':'P';
+  var correct=expected===actual;
+  var row=learned[f.id]||{factorId:f.id,wins:0,losses:0,samples:0,weight:1};
+  row.samples++; if(correct)row.wins++; else row.losses++; row.weight=factorWeight(f.id);
+  learned[f.id]=row; await reqP(tx('factorStats','readwrite').put(row));
+ }
+}
+async function settlePending(actual){
+ if(!state.pendingPrediction)return;
+ var p=state.pendingPrediction;
+ if(p.call==='B'||p.call==='P'){
+  await updateLearning(p,actual);
+  var rec={
+   time:nowIso(),shoeId:state.shoeId,handNo:state.current.length,
+   prediction:p.call,confidence:p.c,actual:actual,hit:p.call===actual,
+   signature:p.signature,factors:p.factors
+  };
+  await reqP(tx('hands','readwrite').add(rec));
+ }
+ state.pendingPrediction=null;
+}
+async function saveShoe(){
+ if(!state.shoeId)return;
+ await reqP(tx('shoes','readwrite').put({shoeId:state.shoeId,updatedAt:nowIso(),sequence:state.current.slice()}));
+ setTimeout(function(){autoCloudSync();},0);
+}
+async function addResult(r){
+ await settlePending(r);
+ state.current.push(r);
+ await saveShoe();
+ await refresh();
+}
+async function refresh(){
+ var rd=roadData(state.current);
+ drawRoad('bead',rd.bead,true);drawRoad('big',rd.big,false);drawRoad('eye',rd.eye,true);drawRoad('small',rd.small,true);drawRoad('cock',rd.cock,true);
+ var c={B:0,P:0,T:0};state.current.forEach(x=>c[x]++);
+ $('hands').textContent=state.current.length;$('bpt').textContent=c.B+' / '+c.P+' / '+c.T;
+ var a=await analyze(state.current);
+ $('bPct').textContent=a.b.toFixed(1)+'%';$('pPct').textContent=a.p.toFixed(1)+'%';$('conf').textContent=a.c+'%';$('similar').textContent=a.sim.samples||0;
+ $('call').textContent=a.call==='B'?'B 莊':a.call==='P'?'P 閒':'PASS';$('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':'#53627a';
+ $('reason').textContent=a.call==='PASS'?'訊號不足，建議 PASS。':'已綜合永久歷史、相似局面與自適應權重。';
+ $('factorBox').innerHTML='';
+ FACTORS.forEach(function(f){
+  var st=learned[f.id]||{samples:0,wins:0};var w=factorWeight(f.id),rate=st.samples?st.wins/st.samples:0;
+  var div=document.createElement('div');div.className='factor';
+  div.innerHTML='<div class="factorTop"><b>'+f.name+'</b><span>權重 '+w.toFixed(2)+'｜樣本 '+st.samples+'｜命中 '+(st.samples?(rate*100).toFixed(1)+'%':'—')+'</span></div><div class="bar"><i style="width:'+Math.min(100,w/1.75*100)+'%"></i></div>';
+  $('factorBox').appendChild(div);
+ });
+ state.pendingPrediction=a;
+ await updateDashboard();await updateCloudStatus();
+}
+async function updateDashboard(){
+ var hands=await allP('hands'),shoes=await allP('shoes');
+ $('dbHands').textContent=shoes.reduce((s,x)=>s+(x.sequence?x.sequence.length:0),0);
+ $('dbShoes').textContent=shoes.length;$('dbPred').textContent=hands.length;
+ var hits=hands.filter(x=>x.hit===true).length;
+ $('acc').textContent=hands.length?(hits/hands.length*100).toFixed(1)+'%':'尚無資料';
+ $('dbStatus').innerHTML='<span class="ok">IndexedDB 已啟用</span>｜資料會持續保存在這台裝置';
+ var recent=hands.slice(-50).reverse();$('historyRows').innerHTML=recent.length?'':'<tr><td colspan="7">尚無紀錄</td></tr>';
+ recent.forEach(function(x){
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td>'+new Date(x.time).toLocaleString()+'</td><td>'+x.shoeId.slice(-6)+'</td><td>'+x.handNo+'</td><td>'+x.prediction+'</td><td>'+x.actual+'</td><td>'+(x.hit?'✓':'✗')+'</td><td>'+x.confidence+'%</td>';
+  $('historyRows').appendChild(tr);
+ });
+}
+async function exportDB(){
+ var payload={version:26,exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V26_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function importDB(file){
+ var data=JSON.parse(await file.text());
+ for(const s of (data.shoes||[])) await reqP(tx('shoes','readwrite').put(s));
+ for(const h of (data.hands||[])) await reqP(tx('hands','readwrite').add(h));
+ for(const f of (data.factorStats||[])) await reqP(tx('factorStats','readwrite').put(f));
+ await loadFactorStats();await refresh();toast('備份已匯入');
+}
+
+function parseManualSequence(raw){
+ var s=(raw||'').toUpperCase().match(/[BPT]/g)||[];
+ return s;
+}
+async function replaceWithManualSequence(){
+ var s=parseManualSequence($('manualSeq').value);
+ if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
+ state.current=s.slice();
+ state.pendingPrediction=null;
+ await saveShoe();
+ $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局';
+ await refresh();
+ toast('已取代目前鞋');
+}
+async function appendManualSequence(){
+ var s=parseManualSequence($('manualSeq').value);
+ if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
+ state.current=state.current.concat(s);
+ state.pendingPrediction=null;
+ await saveShoe();
+ $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局';
+ await refresh();
+ toast('已接續目前鞋');
+}
+
+
+var CLOUD_CFG_KEY='AI_PRO_V26_CLOUD_CFG';
+
+function getCloudConfig(){
+  try{return JSON.parse(localStorage.getItem(CLOUD_CFG_KEY)||'{}')}catch(e){return{}}
+}
+function setCloudConfig(cfg){localStorage.setItem(CLOUD_CFG_KEY,JSON.stringify(cfg||{}));}
+function cloudConfigured(){
+  var c=getCloudConfig();
+  return !!(c.url&&c.key&&c.userId);
+}
+function cloudHeaders(){
+  var c=getCloudConfig();
+  return {
+    'apikey':c.key,
+    'Authorization':'Bearer '+c.key,
+    'Content-Type':'application/json',
+    'Prefer':'resolution=merge-duplicates,return=minimal'
+  };
+}
+function cloudBase(){
+  var c=getCloudConfig();
+  return (c.url||'').replace(/\/+$/,'')+'/rest/v1';
+}
+async function cloudFetch(path,opts){
+  if(!cloudConfigured())throw new Error('尚未設定雲端');
+  opts=opts||{};
+  opts.headers=Object.assign({},cloudHeaders(),opts.headers||{});
+  var r=await fetch(cloudBase()+path,opts);
+  if(!r.ok){
+    var t=await r.text();
+    throw new Error('雲端錯誤 '+r.status+'：'+t.slice(0,180));
+  }
+  if(r.status===204)return null;
+  var txt=await r.text();
+  return txt?JSON.parse(txt):null;
+}
+async function cloudSnapshot(){
+  return {
+    version:26,
+    updatedAt:new Date().toISOString(),
+    shoes:await allP('shoes'),
+    hands:await allP('hands'),
+    factorStats:await allP('factorStats')
+  };
+}
+async function pushCloudData(silent){
+  var c=getCloudConfig();
+  var snap=await cloudSnapshot();
+  await cloudFetch('/ai_pro_state?on_conflict=user_id',{
+    method:'POST',
+    body:JSON.stringify([{user_id:c.userId,payload:snap,updated_at:new Date().toISOString()}])
+  });
+  localStorage.setItem('AI_PRO_V26_LAST_SYNC',new Date().toISOString());
+  await updateCloudStatus();
+  if(!silent)toast('已同步到雲端');
+}
+async function pullCloudData(){
+  var c=getCloudConfig();
+  var rows=await cloudFetch('/ai_pro_state?user_id=eq.'+encodeURIComponent(c.userId)+'&select=payload,updated_at&limit=1',{method:'GET'});
+  if(!rows||!rows.length)throw new Error('雲端尚無備份');
+  var data=rows[0].payload||{};
+  await reqP(tx('shoes','readwrite').clear());
+  await reqP(tx('hands','readwrite').clear());
+  await reqP(tx('factorStats','readwrite').clear());
+  for(const s of (data.shoes||[])) await reqP(tx('shoes','readwrite').put(s));
+  for(const h of (data.hands||[])) await reqP(tx('hands','readwrite').add(h));
+  for(const f of (data.factorStats||[])) await reqP(tx('factorStats','readwrite').put(f));
+  await loadFactorStats();
+  var shoes=await allP('shoes');
+  if(shoes.length){
+    shoes.sort((a,b)=>String(a.updatedAt).localeCompare(String(b.updatedAt)));
+    var s=shoes[shoes.length-1];
+    state.shoeId=s.shoeId;
+    state.current=Array.isArray(s.sequence)?s.sequence:[];
+  }else{
+    state.shoeId=newShoeId();state.current=[];await saveShoe();
+  }
+  state.pendingPrediction=null;
+  localStorage.setItem('AI_PRO_V26_LAST_SYNC',rows[0].updated_at||new Date().toISOString());
+  await refresh();
+  await updateCloudStatus();
+  toast('已從雲端還原');
+}
+async function autoCloudSync(){
+  if(!cloudConfigured())return;
+  try{await pushCloudData(true)}catch(e){if($('cloudInfo'))$('cloudInfo').textContent='自動同步失敗：'+e.message;}
+}
+async function updateCloudStatus(){
+  if(!$('cloudStatus'))return;
+  var cfg=getCloudConfig();
+  $('cloudStatus').textContent=cloudConfigured()?'已設定':'未設定';
+  var last=localStorage.getItem('AI_PRO_V26_LAST_SYNC');
+  $('cloudLastSync').textContent=last?new Date(last).toLocaleString():'—';
+  try{
+    var shoes=await allP('shoes'),hands=await allP('hands');
+    $('cloudLocalShoes').textContent=shoes.length;
+    $('cloudLocalHands').textContent=hands.length;
+  }catch(e){}
+  if(cfg.url)$('supabaseUrl').value=cfg.url;
+  if(cfg.key)$('supabaseKey').value=cfg.key;
+  if(cfg.userId)$('cloudUserId').value=cfg.userId;
+}
+function bindCloudUI(){
+  $('saveCloudConfig').onclick=async function(){
+    var cfg={url:$('supabaseUrl').value.trim(),key:$('supabaseKey').value.trim(),userId:$('cloudUserId').value.trim()};
+    if(!cfg.url||!cfg.key||!cfg.userId)return toast('請填完整雲端設定');
+    setCloudConfig(cfg);$('cloudInfo').textContent='雲端設定已儲存。';await updateCloudStatus();toast('雲端設定已儲存');
+  };
+  $('pushCloud').onclick=async function(){
+    try{await pushCloudData(false);$('cloudInfo').textContent='雲端同步完成。'}catch(e){$('cloudInfo').textContent=e.message;toast('同步失敗')}
+  };
+  $('pullCloud').onclick=async function(){
+    try{await pullCloudData();$('cloudInfo').textContent='雲端還原完成。'}catch(e){$('cloudInfo').textContent=e.message;toast('還原失敗')}
+  };
+  $('clearCloudConfig').onclick=async function(){
+    localStorage.removeItem(CLOUD_CFG_KEY);
+    $('supabaseUrl').value='';$('supabaseKey').value='';$('cloudUserId').value='';
+    $('cloudInfo').textContent='已清除本機雲端設定。';await updateCloudStatus();
+  };
+}
+
+async function start(){
+ await openDB();await loadFactorStats();
+ bindCloudUI();
+ var shoes=await allP('shoes');
+ if(shoes.length){shoes.sort((a,b)=>String(a.updatedAt).localeCompare(String(b.updatedAt)));var s=shoes[shoes.length-1];state.shoeId=s.shoeId;state.current=Array.isArray(s.sequence)?s.sequence:[]}
+ else{state.shoeId=newShoeId();await saveShoe()}
+ document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>addResult(b.dataset.r));
+ $('undo').onclick=async()=>{state.current.pop();state.pendingPrediction=null;await saveShoe();await refresh()};
+ $('newShoe').onclick=async()=>{state.shoeId=newShoeId();state.current=[];state.pendingPrediction=null;await saveShoe();await refresh();toast('已開始新鞋')};
+ $('replay').onclick=async()=>{var seq=state.current.slice();state.current=[];state.pendingPrediction=null;for(const r of seq){state.current.push(r);await new Promise(x=>setTimeout(x,120));await refresh()}};
+ $('exportBtn').onclick=exportDB;
+ $('importInput').onchange=function(){if(this.files[0])importDB(this.files[0]);this.value=''};
+ $('replaceSeq').onclick=replaceWithManualSequence;
+ $('appendSeq').onclick=appendManualSequence;
+ $('clearSeq').onclick=function(){$('manualSeq').value='';$('manualSeqInfo').textContent='尚未輸入序列。'};
+ $('manualSeq').oninput=function(){var s=parseManualSequence(this.value);$('manualSeqInfo').textContent=s.length?'已讀取 '+s.length+' 局':'尚未輸入序列。'};
+ await refresh();
+}
+start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
-</script></body></html>
+</script>
+</body>
+</html>
