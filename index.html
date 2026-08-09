@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V29.2 FULL SYNC</title>
+<title>AI PRO V29.2 FULL SYNC SETTLEMENT LEARNING</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -40,7 +40,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <h1>AI PRO V29.2 FULL SYNC</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.2 FULL SYNC</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.2 SETTLEMENT LEARNING</div></div>
 </header>
 
 <section class="panel">
@@ -55,12 +55,12 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
   </div>
-  <p class="muted">V29.2 已內建 V28.8 歷史路單，首次開啟會自動匯入並接續最後一鞋；莊／閒／和三方機率由相似路型、正反路、下三路、歷史錯誤修正與樣本量動態決定；信心度會用實際命中紀錄再校準。歷史資料不再只累積勝敗。系統先把珠盤路轉成大路與下三路，再以路型、正反鏡像、柱高、單跳/雙跳/長龍/三顆斷/四顆斷等結構搜尋歷史相似節點；錯誤會直接改變同型路的下一次方向權重。T 和局獨立統計。</p>
+  <p class="muted">V28.1 已內建 V27.6 歷史路單，首次開啟會自動匯入並接續最後一鞋；莊／閒／和三方機率由相似路型、正反路、下三路、歷史錯誤修正與樣本量動態決定；信心度會用實際命中紀錄再校準。歷史資料不再只累積勝敗。系統先把珠盤路轉成大路與下三路，再以路型、正反鏡像、柱高、單跳/雙跳/長龍/三顆斷/四顆斷等結構搜尋歷史相似節點；錯誤會直接改變同型路的下一次方向權重。T 和局獨立統計。</p>
 </section>
 
 <section class="panel">
   <h2>手動序列輸入</h2>
-  <p class="muted">輸入框會同步目前整鞋。可貼完整 B/P/T；若在完整序列尾端新增後按「接續目前鞋」，只接續新增部分，不會把整鞋重複加入。</p>
+  <p class="muted">可直接貼上整串 B / P / T，例如：<b>BPPBTTPBBP</b>。空白、逗號、換行會自動忽略。</p>
   <textarea id="manualSeq" placeholder="例如：BPPBTTPBBP"></textarea>
   <div class="grid" style="margin-top:10px">
     <button id="replaceSeq">取代目前鞋</button>
@@ -78,16 +78,17 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div><b id="tPct">10.0%</b><span class="muted">和機率</span></div>
     <div><b id="conf">0%</b><span class="muted">模型信心（訊號一致度）</span></div>
   </div>
-  <div id="call" class="call">本局：PASS｜有效勝率 —｜不下注</div>
+  <div id="call" class="call">PASS</div>
   <div class="cards" style="margin-top:12px">
     <div class="card"><span class="muted">目前局數</span><b id="hands">0</b></div>
     <div class="card"><span class="muted">莊／閒／和</span><b id="bpt">0 / 0 / 0</b></div>
     <div class="card"><span class="muted">相似樣本</span><b id="similar">0</b></div>
     <div class="card"><span class="muted">相似局歷史支持</span><b id="acc">尚無資料</b></div>
     <div class="card"><span class="muted">目前路段勝率</span><b id="segmentWin">樣本不足</b></div>
-    <div class="card"><span class="muted">預測這條路勝率（本局證據）</span><b id="thisRoadWin">樣本不足</b></div>
-    <div class="card"><span class="muted">預測下一條路勝率（後續預判，非本局下注）</span><b id="nextRoadWin">樣本不足</b></div>
+    <div class="card"><span class="muted">預測這條路勝率<br>（本局證據）</span><b id="currentRoadWin">樣本不足</b></div>
+    <div class="card"><span class="muted">預測下一條路勝率<br>（後續預判，非本局下注）</span><b id="nextRoadWin">樣本不足</b></div>
     <div class="card"><span class="muted">同路型實戰命中</span><b id="segmentLive">尚無資料</b></div>
+    <div class="card"><span class="muted">下注判定</span><b id="betGrade">觀察</b></div>
   </div>
   <p id="reason" class="muted"></p>
 </section>
@@ -103,8 +104,8 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
   <div class="cards">
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
-    <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b id="modelVersion">V29.2</b></div>
+    <div class="card"><span class="muted">已結算預測</span><b id="dbPred">0</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V29.2</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -158,43 +159,37 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 var $=function(id){return document.getElementById(id)};
 var DB_NAME='AI_PRO_V26_DB', DB_VERSION=1, db=null;
 var state={shoeId:null,current:[],pendingPrediction:null};
-var PRELOADED_HISTORY={"version":"28.8","exportedAt":"2026-08-09T12:15:21.026Z","shoes":[{"shoeId":"S1786160218924","updatedAt":"2026-08-08T03:39:08.619Z","sequence":["P","P","P","B","T","B","B"]},{"shoeId":"S1786160375765","updatedAt":"2026-08-08T03:43:38.694Z","sequence":["P","P","P","B","T","B","B","P","B","B","P","B","P","B","P","B","T","B","B","P","P","B","B","T","P","B","P","P","B","B","P","P","P","P","B","P","B","B","B","T","P","P","P","B","T","B","B","P","B","B","P","B","P","B","P","B","T","B","B","P","P","B","B","T","P","B","P","P","B","B","P","P","P","P","B","P","B","B","B","P","P","B"]},{"shoeId":"S1786160667649","updatedAt":"2026-08-08T04:10:26.130Z","sequence":["P","B","P","P","P","B","B","P","B","P","P","B","B","P","B","B","B","P","B","P","P","P","B","P","B","B","B","B","B","P","B","B","T","P","B","P","P","B","P","B","P","B","P","P","P","B"]},{"shoeId":"S1786162250686","updatedAt":"2026-08-08T04:12:52.291Z","sequence":["T","P","P","B","B","T","P","P","B","P","T","P","B","B","P","B","B","P","B","B","P","B","P","B","P","P","B","B","B","B","T","P","P","B","B","P","B","B","T"]},{"shoeId":"S1786162425873","updatedAt":"2026-08-08T04:15:57.676Z","sequence":["T","P","P","T","B","P","T","P","P","B","B","T","P","P","B","P","T","P","B","B","P","B","B","P","B","P","P","B","P","B","P","P","B"]},{"shoeId":"S1786162580735","updatedAt":"2026-08-08T04:16:20.736Z","sequence":[]},{"shoeId":"S1786162703758","updatedAt":"2026-08-08T04:21:13.761Z","sequence":["P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B","B","P","P","P","P","P","B","B","B","P","P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B","B","P","P","P","P","P","B","B","B","P","P","P","P","B","P","B","P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B","P","P","P","B","P","B","P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B"]},{"shoeId":"S1786162877405","updatedAt":"2026-08-08T04:26:39.380Z","sequence":["P","P","B","P","B","B","B","P","B","P","P","P","T","B","B","P","B","B","T","T","P","P","P","B","P","B","P","P","B","P"]},{"shoeId":"S1786163203266","updatedAt":"2026-08-08T04:29:23.785Z","sequence":["P","T","B","T","T","B","T","B","B","P","P","B","P","B","B","B","B","B","T","B","B","P","P","T","T","P","B","P","P","B","P","B","B","B","B","B","P","T","B","T","T","B","T","B","B","P","P","B","P","B","B","B","B","B","T","B","B","P","P","T","T","P","B","P","P","B","P","B","B","B","B","B"]},{"shoeId":"S1786163372127","updatedAt":"2026-08-08T04:32:25.377Z","sequence":["B","B","B","B","P","P","B","B","P","P","P","B","P","P","P","B","B","B","B","P","P","B","P","P","B","B","P","B","B","B","B","B","P","T","P","T","P","B","P"]},{"shoeId":"S1786163549908","updatedAt":"2026-08-08T04:39:02.329Z","sequence":["B","B","B","B","P","P","B","B","P","P","P","B","P","P","P","B","B","B","B","P","P","B","P","P","B","B","P","B","B","B","B","B","P","T","P","T","P","B","P","B","B","B","B","P","B","B","B","B","B","P","B","B","B","B","B","P","P","B","B","P","P","P","B","P","P","P","B","B","B","B","P","P","B","P","P","B","B","P","B","B","B"]},{"shoeId":"S1786164004224","updatedAt":"2026-08-08T04:40:04.224Z","sequence":[]},{"shoeId":"S1786164346083","updatedAt":"2026-08-08T04:45:46.083Z","sequence":[]},{"shoeId":"S1786164367619","updatedAt":"2026-08-08T04:47:19.579Z","sequence":["P","B","P","P","B","P","B","P","P","P","T","P","T","T","P","P","B"]},{"shoeId":"S1786164446917","updatedAt":"2026-08-08T04:51:11.545Z","sequence":["P","B","P","P","B","P","B","P","P","P","T","P","T","T","P","P","B"]},{"shoeId":"S1786169103665","updatedAt":"2026-08-08T06:19:28.747Z","sequence":["P","P","T","P","B","P","P","P","T","P","P","P","B","B","B","P","P","P","B","P","B","P","B"]},{"shoeId":"S1786169975951","updatedAt":"2026-08-08T06:19:35.951Z","sequence":[]},{"shoeId":"S1786169983452","updatedAt":"2026-08-08T06:19:43.452Z","sequence":[]},{"shoeId":"S1786169984084","updatedAt":"2026-08-08T06:21:53.472Z","sequence":["P","P","B","B","P","B","T","B","P","T","P","P","P","B","P","P","B","P","P","B","B","B","P","B","B","P","B","B","B","B","B","P","P","P","P","B","T","P","P","P","B","B"]},{"shoeId":"S1786170145359","updatedAt":"2026-08-08T06:22:25.359Z","sequence":[]},{"shoeId":"S1786170156139","updatedAt":"2026-08-08T06:23:43.044Z","sequence":["P","P","T","P","B","P","P","P","T","P","P","P","B","B","B","P","P","P","B","P","B","P","B"]},{"shoeId":"S1786170232206","updatedAt":"2026-08-08T06:25:26.840Z","sequence":["B","P","B","P","B","P","B","P","T","T","P","B","P","P","P","P","P","P","P","T","B","T","B","P","B","B","P","P","P","P","B","P","P","B","P","P","P","P","P","B"]},{"shoeId":"S1786170345820","updatedAt":"2026-08-08T06:27:06.739Z","sequence":["P","T","B","B","P","P","P","P","P","B","P","B","P","P","T","P","B","B","P","P","P","P","P","B","P","B","P","P","B","B","P","P","B","B","P","B","B","B","P","P","B"]},{"shoeId":"S1786170474425","updatedAt":"2026-08-08T06:32:11.282Z","sequence":["T","B","T","B","B","P","P","P","B","B","P","B","T","B","P","T","P","P","P","B","P","P","B","P","P","B","B","B","P","B","B","P","B","B","B","B","B","P","P","P","P","B","B","P","P","B","P","P","P","B","B","P","P","B","B","B","B","T","P","P","T","B","B","P","P","P","P","P","B","P","B","P","P","T","P","B","B","P","P","P","P"]},{"shoeId":"S1786170737777","updatedAt":"2026-08-08T07:41:14.924Z","sequence":["P","B","P","P","P","B","P","T","T","P","B","B","T","B","T","B","B","P","P","P","B","B","P","B","T","B","P","T","P","P","P","B","P","P","B","P","B","B","P","P","B","B","B","B","P","P","B","B","B","B","B","P","B","B","P","P","B","P","P","P","P","B","P","T","P","T","P","B","B","P","P","B","B","B","P","B","B"]},{"shoeId":"S1786174882926","updatedAt":"2026-08-08T07:42:51.007Z","sequence":["B","T","B","B","B","T","P","B","B","T","B","B","B","B","B","P","P","B","P","P","P","B","P","B","B","P","B","P","T","B","B","P","P","B","P","B","B","P","B","B","B"]},{"shoeId":"S1786175061196","updatedAt":"2026-08-08T07:45:12.455Z","sequence":["P","P","B","P","B","P","B","P","B","B","T","P","B","B","P","P","B","T","T","B","B","P","P","B","P","B","B","P","P","P","B","P","P","B","B","B","B","B"]},{"shoeId":"S1786175183802","updatedAt":"2026-08-08T07:46:25.748Z","sequence":["P","P","B","P","B","P","B","P","B","B","T","P","B","B","P","P","B","T","T","B","B","P","P","B","P","B","B","P","P","P","B","P","P","B","B","B","B","B"]},{"shoeId":"S1786176511827","updatedAt":"2026-08-08T08:09:30.692Z","sequence":["B","P","P","P","P","T","P","T","P","P","B","P","P","P","T","P","B","P","B","B","B","B","P","P","P","B","P","B","B","B","P","P","B","B","P","B","T","P","P","B","P"]},{"shoeId":"S1786176645693","updatedAt":"2026-08-08T08:12:27.394Z","sequence":["B","P","B","B","B","B","B","P","B","T","B","B","B","P","B","P","P","B","P","T","B","B","P","P","P","P","P","B","P","B","P","B","P","P"]},{"shoeId":"S1786176789773","updatedAt":"2026-08-08T08:13:09.773Z","sequence":[]},{"shoeId":"S1786176913716","updatedAt":"2026-08-08T08:27:38.629Z","sequence":["P","B","B","B","P","B","B","P","P","P","B","P","B","B","P","B","B","P","B","B","T","T","P","P","B","P","T","B","B","P","P","B","T","B","B","B","B","P","B","P"]},{"shoeId":"S1786177665815","updatedAt":"2026-08-08T08:28:45.073Z","sequence":["P","T","T","P","B","P","P","B","B","B","B","P","B","B","T","B","P","P","B","B","P","B","P","T","T","B","B","B","P","B","P","P","P","B","P","P","P","P"]},{"shoeId":"S1786177741049","updatedAt":"2026-08-08T08:29:01.049Z","sequence":[]},{"shoeId":"S1786177741828","updatedAt":"2026-08-08T08:29:01.828Z","sequence":[]},{"shoeId":"S1786177743162","updatedAt":"2026-08-08T08:29:03.162Z","sequence":[]},{"shoeId":"S1786177744712","updatedAt":"2026-08-08T08:31:28.208Z","sequence":["P","T","B","P","B","T","P","B","P","P","T","B","P","B","B","B","B","B","B","P","T","B","B","B","B","B","B","B","B","B","P","T","B","B","B","P","B","B","B","P","P","B","P","T","P","P","P","P","B","B","P","B","P","P","B","P","P","P","T","T","B","B"]},{"shoeId":"S1786178230514","updatedAt":"2026-08-08T08:37:10.518Z","sequence":[]},{"shoeId":"S1786178388241","updatedAt":"2026-08-08T08:40:43.229Z","sequence":["B","B","B","B","B","P","P","T","P","B","P","T","P","B","B","B","P","T","P","T","B","P","B","T","B","T","P","B","B","P","P","B","B","P","P","P"]},{"shoeId":"S1786178481745","updatedAt":"2026-08-08T08:47:11.623Z","sequence":["B","B","B","B","B","P","P","T","P","B","P","T","P","B","B","B","P","T","P","T","B","P","B","T","B","T","P","B","B","P","P","B","B","P","P","P","B","B","T","B","P","P","B","B","P","B","P","T","T","B","B","B","P","B","P","P","P","B","P","P","P","P","P","B","T","B","B","B","B","B","B","P","B","B"]},{"shoeId":"S1786178902166","updatedAt":"2026-08-08T09:14:07.860Z","sequence":["P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","P","B","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","B","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","P","B","P","T","P","P","B","B","B","B","P","P","P","P","B","B","P","B","T","P","B","P","B","P","P","P","T","P","P","B","P","P"]},{"shoeId":"S1786180472887","updatedAt":"2026-08-08T09:14:32.887Z","sequence":[]},{"shoeId":"S1786180474749","updatedAt":"2026-08-08T09:31:53.353Z","sequence":["P","P","P","B","B","P","B","T","P","B","P","B","P","P","P","T","P","P","B","P","P","P","B","P","P","P","P","P","B","B","B","P","P","B","B","P","P","B","P","B","B","B","P","B"]},{"shoeId":"S1786181521609","updatedAt":"2026-08-08T14:41:54.125Z","sequence":["P","T","B","B","P","P","B","B","P","B","T","B","P","B","B","P","B","T","B","P","P","P","T","B","P","B","P","B","B","P","B","P","P","P","P","P","P","B","B","B","B","P","P","P","P","P","B","P","B","B","B","B","P","P","B","P","P","B","B","B","B","B","P","B","P","P","B","P","B"]},{"shoeId":"S1786200186876","updatedAt":"2026-08-08T14:53:50.754Z","sequence":["B","P"]},{"shoeId":"S1786200845438","updatedAt":"2026-08-08T15:39:31.732Z","sequence":["P","P","P","B","P","P","P","P","P","B","P","P","P","B","P","P","B","P","P","P","T","P","B","B","B","P","B","B","T","T","P","P","B","P","B","P","B","P","B","P","P","B","B","B","B","B","B","P","P","T","B","P","B","T","B","B","B","P","P","P","P","P","P","B","B","B","T"]},{"shoeId":"S1786203577133","updatedAt":"2026-08-08T15:39:37.134Z","sequence":[]},{"shoeId":"S1786203577999","updatedAt":"2026-08-08T15:39:37.999Z","sequence":[]},{"shoeId":"S1786203580348","updatedAt":"2026-08-08T16:42:43.165Z","sequence":["T","P","P","P","T","B","B","B","B","B","P","T","B","B","B","B","P","P","P","P","P","B","T","P","B","B","T","P","B","P","T","B","P","P","T","B","P","B","B","P","B","P","P","B","P","P","B","B","P","P","B","B","P","T","P","B","P","B","P","B"]},{"shoeId":"S1786207390938","updatedAt":"2026-08-09T01:34:52.523Z","sequence":["P","B","P","B","B","B","P","P","B","P","P","P","P","P","P","B","T","B","B","P","T","B","P","B","B","B","P","P","P","P","B","B","B","B","P","P","B","P","P","T","T","T","B","B","P","P","P","B","P"]},{"shoeId":"S1786239336584","updatedAt":"2026-08-09T02:30:40.163Z","sequence":["P","B","B","P","P","P","P","P","T","B","T","P","P","P","T","P","P","T","B","B","B","B","P","B","B","T","P","B","B","P"]},{"shoeId":"S1786243128374","updatedAt":"2026-08-09T03:02:17.180Z","sequence":["B","P","B","P","B","B","B","P","B","B","P","T","P","B","B","B","P","B","B","B","P","P","P","T","P","B","P","P","T","B","B","P","B","P","B","P","B","P","P","P","P","T","P","B","B","B","T"]},{"shoeId":"S1786244574861","updatedAt":"2026-08-09T06:36:40.298Z","sequence":["B","P","T","P","B","B","B","P","B","P","P","P","P","B","P","B","P","B","B","B","P","P","B","P","B","B","P","P","B","P","T","P","P","P","P","B","B","T","B","B","B","T","B","B","P","P","P","P","P","B","P","B","B","P","P","B","B","B","P","B","T","P","B","P","B","P","P","P","T"]},{"shoeId":"S1786257419177","updatedAt":"2026-08-09T07:15:18.885Z","sequence":["B","B","B","P","P","P","P","B","B","B","T","B","P","B","B","P","P","P","P","B","B","P","P","P","B","P","B","T","B","B","T","B","B","P","B","B","P","B","P","B","B","B","B","P","P","P","B","P","P","B","B","P","P","B","P","P","P","B","T","B","P","B","T","P","T","P","P","B"]},{"shoeId":"S1786260369369","updatedAt":"2026-08-09T07:26:09.370Z","sequence":[]},{"shoeId":"S1786260370303","updatedAt":"2026-08-09T07:31:20.084Z","sequence":["P","B","P","B","P","B","B","B","P","P","B","P","B","B","B","B","P","P","P","B","B","P","B","B","B","P","B","P","B","P","P","P","P","B","B","B","P","B","P","B","B"]},{"shoeId":"S1786260688698","updatedAt":"2026-08-09T07:33:55.620Z","sequence":["P","P","P","P","B","P","P","B","B","P","P","B","B","P","T","B","B","P","T","T","B","B","T","P","B","T","B","B","T","P","B","B","B","T","T","B","B","B","P","P"]},{"shoeId":"S1786260846892","updatedAt":"2026-08-09T07:34:06.892Z","sequence":[]},{"shoeId":"S1786260848225","updatedAt":"2026-08-09T07:35:27.347Z","sequence":["P","P","B","B","P","P","T","P","P","B","P","B","P","B","P","B","B","P","P","P","P","P","P","P","P","P","B","T","B","B","P","B","B","P","P"]},{"shoeId":"S1786260942517","updatedAt":"2026-08-09T07:38:43.193Z","sequence":["B","B","P","P","B","P","B","B","B","B","P","P","P","B","B","P","B","B","B","P","B","P","B","P","P","P","P","B","B","B","P","B","P","B","B","P","B","B","P","B","B","B","P","B","P"]},{"shoeId":"S1786261145489","updatedAt":"2026-08-09T11:55:48.207Z","sequence":["P","T","B","T","P","P","B","P","B","B","B","P","B","P","B","P","P","B","P","P","B","B","P","B","P","T","B","B","B","B"]},{"shoeId":"S1786276567867","updatedAt":"2026-08-09T12:06:23.333Z","sequence":["P","P","B","B","T","P","P","B","B","B","B","P","P","B","P","B","P","P","B","B","P","P","B","B","P","P","P","P","P"]},{"shoeId":"S1786277331761","updatedAt":"2026-08-09T12:08:51.761Z","sequence":[]},{"shoeId":"S1786277369946","updatedAt":"2026-08-09T12:15:15.952Z","sequence":["B","P","P","P","P","B","B","B","B","B","P","P","B","B","P","P","P","B","B","P","B","P","B","B"]}],"hands":[{"time":"2026-08-08T03:41:11.652Z","shoeId":"S1786160375765","handNo":39,"prediction":"B","confidence":57,"actual":"T","hit":false,"signature":"PBPBBB|L3|PBPB|PPPB|PPBB","factors":[{"id":"recentBias","name":"最近10局偏向","w":1,"v":0,"impact":0},{"id":"streak","name":"連莊／連閒延續","w":0.9,"v":0.75,"impact":0.675},{"id":"alternation","name":"單跳／交替","w":0.8,"v":0,"impact":0},{"id":"bigRoad","name":"大路結構","w":1.1,"v":0.45,"impact":0.49500000000000005},{"id":"eye","name":"大眼仔","w":0.85,"v":0.35,"impact":0.2975},{"id":"small","name":"小路","w":0.8,"v":0.3,"impact":0.24},{"id":"cock","name":"曱甴路","w":0.75,"v":0.25,"impact":0.1875},{"id":"similar","name":"歷史相似局面","w":1.25,"v":0,"impact":0}],"id":1},{"time":"2026-08-09T12:13:16.626Z","shoeId":"S1786277369946","handNo":21,"prediction":"T","confidence":67,"actual":"P","hit":false,"signature":"混合路|2-2-3-2-1-1|2-2-3-2-1-1|BBBPPBPP|BPBPPBBP|BPBBPBBP","factors":[{"id":"大路結構","name":"大路結構","w":0.16556044101970685,"v":0.05827594757307275,"impact":0.00964819158103924,"rate":0.5291379737865364},{"id":"大眼仔","name":"大眼仔","w":0.10809961439616178,"v":0.031221793773513085,"impact":0.0033750638676732494,"rate":0.5156108968867565},{"id":"小路","name":"小路","w":0.09951503221713345,"v":0.02750296165746602,"impact":0.002736958115409317,"rate":0.513751480828733},{"id":"曱甴路","name":"曱甴路","w":0.26330629150715096,"v":-0.2361806067989518,"impact":-0.062187839702140604,"rate":0.3819096966005241},{"id":"similar","name":"歷史相似路","w":0.4,"v":0.05827594757307275,"impact":0.0233103790292291,"rate":0.5291379737865364},{"id":"breakCross","name":"斷點下三路交叉","w":0.45,"v":0.05797048626890433,"impact":0.026086718821006948,"rate":0.5289852431344522,"continueProb":0.4849397465866984,"breakProb":0.5150602534133015}],"correction":"DOWNWEIGHT","routeClass":"混合路","historicalSamples":379,"routeMemorySamples":0,"routeMemoryHitRate":0.5,"breakpointCross":{"currentSide":"B","currentLen":1,"samples":379,"histB":0.5289852431344522,"histP":0.47101475686554783,"continueProb":0.4849397465866984,"breakProb":0.5150602534133015,"roads":{"big":{"b":0.5289852431344522,"p":0.4710147568655479,"strength":0.057970486268904255},"eye":{"b":0.5158499299825774,"p":0.48415007001742255,"strength":0.03169985996515482},"small":{"b":0.5138334639522991,"p":0.48616653604770105,"strength":0.027666927904598026},"cock":{"b":0.3817418750683404,"p":0.6182581249316594,"strength":0.2365162498633191}},"tieRate":0.3676045758796148},"reflection":{"historySamples":379,"routeClass":"混合路","correction":"DOWNWEIGHT","currentEvidence":{"big":{"b":0.5291379737865364,"p":0.4708620262134635,"direction":"B","strength":0.05827594757307275},"eye":{"b":0.5156108968867565,"p":0.4843891031132435,"direction":"B","strength":0.031221793773513085},"small":{"b":0.513751480828733,"p":0.48624851917126694,"direction":"B","strength":0.02750296165746602},"cock":{"b":0.3819096966005241,"p":0.6180903033994759,"direction":"P","strength":0.2361806067989518},"breakpoint":{"continueProb":0.4849397465866984,"breakProb":0.5150602534133015,"samples":379}},"warnings":[]},"id":2}],"factorStats":[{"factorId":"alternation","wins":194,"losses":155,"samples":349,"weight":1.381476323119777},{"factorId":"bigRoad","wins":799,"losses":823,"samples":1622,"weight":1.291241548862938},{"factorId":"cock","wins":812,"losses":701,"samples":1513,"weight":1.3523715415019764},{"factorId":"eye","wins":810,"losses":805,"samples":1615,"weight":1.300925925925926},{"factorId":"recentBias","wins":625,"losses":592,"samples":1217,"weight":1.3201711491442545},{"factorId":"similar","wins":884,"losses":710,"samples":1594,"weight":1.3865746549560853},{"factorId":"small","wins":818,"losses":757,"samples":1575,"weight":1.3275316455696202},{"factorId":"streak","wins":799,"losses":818,"samples":1617,"weight":1.291241548862938}]};
+var PRELOADED_HISTORY={"version":"27.6","exportedAt":"2026-08-09T07:46:15.379Z","shoes":[{"shoeId":"S1786160218924","updatedAt":"2026-08-08T03:39:08.619Z","sequence":["P","P","P","B","T","B","B"]},{"shoeId":"S1786160375765","updatedAt":"2026-08-08T03:43:38.694Z","sequence":["P","P","P","B","T","B","B","P","B","B","P","B","P","B","P","B","T","B","B","P","P","B","B","T","P","B","P","P","B","B","P","P","P","P","B","P","B","B","B","T","P","P","P","B","T","B","B","P","B","B","P","B","P","B","P","B","T","B","B","P","P","B","B","T","P","B","P","P","B","B","P","P","P","P","B","P","B","B","B","P","P","B"]},{"shoeId":"S1786160667649","updatedAt":"2026-08-08T04:10:26.130Z","sequence":["P","B","P","P","P","B","B","P","B","P","P","B","B","P","B","B","B","P","B","P","P","P","B","P","B","B","B","B","B","P","B","B","T","P","B","P","P","B","P","B","P","B","P","P","P","B"]},{"shoeId":"S1786162250686","updatedAt":"2026-08-08T04:12:52.291Z","sequence":["T","P","P","B","B","T","P","P","B","P","T","P","B","B","P","B","B","P","B","B","P","B","P","B","P","P","B","B","B","B","T","P","P","B","B","P","B","B","T"]},{"shoeId":"S1786162425873","updatedAt":"2026-08-08T04:15:57.676Z","sequence":["T","P","P","T","B","P","T","P","P","B","B","T","P","P","B","P","T","P","B","B","P","B","B","P","B","P","P","B","P","B","P","P","B"]},{"shoeId":"S1786162580735","updatedAt":"2026-08-08T04:16:20.736Z","sequence":[]},{"shoeId":"S1786162703758","updatedAt":"2026-08-08T04:21:13.761Z","sequence":["P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B","B","P","P","P","P","P","B","B","B","P","P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B","B","P","P","P","P","P","B","B","B","P","P","P","P","B","P","B","P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B","P","P","P","B","P","B","P","B","B","P","B","P","P","P","T","P","P","B","B","P","B","T","P","B","P","P","B","P","B","B","P","B","P","B","P","B","P","B"]},{"shoeId":"S1786162877405","updatedAt":"2026-08-08T04:26:39.380Z","sequence":["P","P","B","P","B","B","B","P","B","P","P","P","T","B","B","P","B","B","T","T","P","P","P","B","P","B","P","P","B","P"]},{"shoeId":"S1786163203266","updatedAt":"2026-08-08T04:29:23.785Z","sequence":["P","T","B","T","T","B","T","B","B","P","P","B","P","B","B","B","B","B","T","B","B","P","P","T","T","P","B","P","P","B","P","B","B","B","B","B","P","T","B","T","T","B","T","B","B","P","P","B","P","B","B","B","B","B","T","B","B","P","P","T","T","P","B","P","P","B","P","B","B","B","B","B"]},{"shoeId":"S1786163372127","updatedAt":"2026-08-08T04:32:25.377Z","sequence":["B","B","B","B","P","P","B","B","P","P","P","B","P","P","P","B","B","B","B","P","P","B","P","P","B","B","P","B","B","B","B","B","P","T","P","T","P","B","P"]},{"shoeId":"S1786163549908","updatedAt":"2026-08-08T04:39:02.329Z","sequence":["B","B","B","B","P","P","B","B","P","P","P","B","P","P","P","B","B","B","B","P","P","B","P","P","B","B","P","B","B","B","B","B","P","T","P","T","P","B","P","B","B","B","B","P","B","B","B","B","B","P","B","B","B","B","B","P","P","B","B","P","P","P","B","P","P","P","B","B","B","B","P","P","B","P","P","B","B","P","B","B","B"]},{"shoeId":"S1786164004224","updatedAt":"2026-08-08T04:40:04.224Z","sequence":[]},{"shoeId":"S1786164346083","updatedAt":"2026-08-08T04:45:46.083Z","sequence":[]},{"shoeId":"S1786164367619","updatedAt":"2026-08-08T04:47:19.579Z","sequence":["P","B","P","P","B","P","B","P","P","P","T","P","T","T","P","P","B"]},{"shoeId":"S1786164446917","updatedAt":"2026-08-08T04:51:11.545Z","sequence":["P","B","P","P","B","P","B","P","P","P","T","P","T","T","P","P","B"]},{"shoeId":"S1786169103665","updatedAt":"2026-08-08T06:19:28.747Z","sequence":["P","P","T","P","B","P","P","P","T","P","P","P","B","B","B","P","P","P","B","P","B","P","B"]},{"shoeId":"S1786169975951","updatedAt":"2026-08-08T06:19:35.951Z","sequence":[]},{"shoeId":"S1786169983452","updatedAt":"2026-08-08T06:19:43.452Z","sequence":[]},{"shoeId":"S1786169984084","updatedAt":"2026-08-08T06:21:53.472Z","sequence":["P","P","B","B","P","B","T","B","P","T","P","P","P","B","P","P","B","P","P","B","B","B","P","B","B","P","B","B","B","B","B","P","P","P","P","B","T","P","P","P","B","B"]},{"shoeId":"S1786170145359","updatedAt":"2026-08-08T06:22:25.359Z","sequence":[]},{"shoeId":"S1786170156139","updatedAt":"2026-08-08T06:23:43.044Z","sequence":["P","P","T","P","B","P","P","P","T","P","P","P","B","B","B","P","P","P","B","P","B","P","B"]},{"shoeId":"S1786170232206","updatedAt":"2026-08-08T06:25:26.840Z","sequence":["B","P","B","P","B","P","B","P","T","T","P","B","P","P","P","P","P","P","P","T","B","T","B","P","B","B","P","P","P","P","B","P","P","B","P","P","P","P","P","B"]},{"shoeId":"S1786170345820","updatedAt":"2026-08-08T06:27:06.739Z","sequence":["P","T","B","B","P","P","P","P","P","B","P","B","P","P","T","P","B","B","P","P","P","P","P","B","P","B","P","P","B","B","P","P","B","B","P","B","B","B","P","P","B"]},{"shoeId":"S1786170474425","updatedAt":"2026-08-08T06:32:11.282Z","sequence":["T","B","T","B","B","P","P","P","B","B","P","B","T","B","P","T","P","P","P","B","P","P","B","P","P","B","B","B","P","B","B","P","B","B","B","B","B","P","P","P","P","B","B","P","P","B","P","P","P","B","B","P","P","B","B","B","B","T","P","P","T","B","B","P","P","P","P","P","B","P","B","P","P","T","P","B","B","P","P","P","P"]},{"shoeId":"S1786170737777","updatedAt":"2026-08-08T07:41:14.924Z","sequence":["P","B","P","P","P","B","P","T","T","P","B","B","T","B","T","B","B","P","P","P","B","B","P","B","T","B","P","T","P","P","P","B","P","P","B","P","B","B","P","P","B","B","B","B","P","P","B","B","B","B","B","P","B","B","P","P","B","P","P","P","P","B","P","T","P","T","P","B","B","P","P","B","B","B","P","B","B"]},{"shoeId":"S1786174882926","updatedAt":"2026-08-08T07:42:51.007Z","sequence":["B","T","B","B","B","T","P","B","B","T","B","B","B","B","B","P","P","B","P","P","P","B","P","B","B","P","B","P","T","B","B","P","P","B","P","B","B","P","B","B","B"]},{"shoeId":"S1786175061196","updatedAt":"2026-08-08T07:45:12.455Z","sequence":["P","P","B","P","B","P","B","P","B","B","T","P","B","B","P","P","B","T","T","B","B","P","P","B","P","B","B","P","P","P","B","P","P","B","B","B","B","B"]},{"shoeId":"S1786175183802","updatedAt":"2026-08-08T07:46:25.748Z","sequence":["P","P","B","P","B","P","B","P","B","B","T","P","B","B","P","P","B","T","T","B","B","P","P","B","P","B","B","P","P","P","B","P","P","B","B","B","B","B"]},{"shoeId":"S1786176511827","updatedAt":"2026-08-08T08:09:30.692Z","sequence":["B","P","P","P","P","T","P","T","P","P","B","P","P","P","T","P","B","P","B","B","B","B","P","P","P","B","P","B","B","B","P","P","B","B","P","B","T","P","P","B","P"]},{"shoeId":"S1786176645693","updatedAt":"2026-08-08T08:12:27.394Z","sequence":["B","P","B","B","B","B","B","P","B","T","B","B","B","P","B","P","P","B","P","T","B","B","P","P","P","P","P","B","P","B","P","B","P","P"]},{"shoeId":"S1786176789773","updatedAt":"2026-08-08T08:13:09.773Z","sequence":[]},{"shoeId":"S1786176913716","updatedAt":"2026-08-08T08:27:38.629Z","sequence":["P","B","B","B","P","B","B","P","P","P","B","P","B","B","P","B","B","P","B","B","T","T","P","P","B","P","T","B","B","P","P","B","T","B","B","B","B","P","B","P"]},{"shoeId":"S1786177665815","updatedAt":"2026-08-08T08:28:45.073Z","sequence":["P","T","T","P","B","P","P","B","B","B","B","P","B","B","T","B","P","P","B","B","P","B","P","T","T","B","B","B","P","B","P","P","P","B","P","P","P","P"]},{"shoeId":"S1786177741049","updatedAt":"2026-08-08T08:29:01.049Z","sequence":[]},{"shoeId":"S1786177741828","updatedAt":"2026-08-08T08:29:01.828Z","sequence":[]},{"shoeId":"S1786177743162","updatedAt":"2026-08-08T08:29:03.162Z","sequence":[]},{"shoeId":"S1786177744712","updatedAt":"2026-08-08T08:31:28.208Z","sequence":["P","T","B","P","B","T","P","B","P","P","T","B","P","B","B","B","B","B","B","P","T","B","B","B","B","B","B","B","B","B","P","T","B","B","B","P","B","B","B","P","P","B","P","T","P","P","P","P","B","B","P","B","P","P","B","P","P","P","T","T","B","B"]},{"shoeId":"S1786178230514","updatedAt":"2026-08-08T08:37:10.518Z","sequence":[]},{"shoeId":"S1786178388241","updatedAt":"2026-08-08T08:40:43.229Z","sequence":["B","B","B","B","B","P","P","T","P","B","P","T","P","B","B","B","P","T","P","T","B","P","B","T","B","T","P","B","B","P","P","B","B","P","P","P"]},{"shoeId":"S1786178481745","updatedAt":"2026-08-08T08:47:11.623Z","sequence":["B","B","B","B","B","P","P","T","P","B","P","T","P","B","B","B","P","T","P","T","B","P","B","T","B","T","P","B","B","P","P","B","B","P","P","P","B","B","T","B","P","P","B","B","P","B","P","T","T","B","B","B","P","B","P","P","P","B","P","P","P","P","P","B","T","B","B","B","B","B","B","P","B","B"]},{"shoeId":"S1786178902166","updatedAt":"2026-08-08T09:14:07.860Z","sequence":["P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","P","B","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","B","P","P","T","B","P","P","B","P","B","B","B","B","B","T","P","P","P","P","P","P","B","P","B","P","P","P","B","P","P","B","P","B","P","P","P","P","P","P","B","P","P","B","P","T","P","P","B","B","B","B","P","P","P","P","B","B","P","B","T","P","B","P","B","P","P","P","T","P","P","B","P","P"]},{"shoeId":"S1786180472887","updatedAt":"2026-08-08T09:14:32.887Z","sequence":[]},{"shoeId":"S1786180474749","updatedAt":"2026-08-08T09:31:53.353Z","sequence":["P","P","P","B","B","P","B","T","P","B","P","B","P","P","P","T","P","P","B","P","P","P","B","P","P","P","P","P","B","B","B","P","P","B","B","P","P","B","P","B","B","B","P","B"]},{"shoeId":"S1786181521609","updatedAt":"2026-08-08T14:41:54.125Z","sequence":["P","T","B","B","P","P","B","B","P","B","T","B","P","B","B","P","B","T","B","P","P","P","T","B","P","B","P","B","B","P","B","P","P","P","P","P","P","B","B","B","B","P","P","P","P","P","B","P","B","B","B","B","P","P","B","P","P","B","B","B","B","B","P","B","P","P","B","P","B"]},{"shoeId":"S1786200186876","updatedAt":"2026-08-08T14:53:50.754Z","sequence":["B","P"]},{"shoeId":"S1786200845438","updatedAt":"2026-08-08T15:39:31.732Z","sequence":["P","P","P","B","P","P","P","P","P","B","P","P","P","B","P","P","B","P","P","P","T","P","B","B","B","P","B","B","T","T","P","P","B","P","B","P","B","P","B","P","P","B","B","B","B","B","B","P","P","T","B","P","B","T","B","B","B","P","P","P","P","P","P","B","B","B","T"]},{"shoeId":"S1786203577133","updatedAt":"2026-08-08T15:39:37.134Z","sequence":[]},{"shoeId":"S1786203577999","updatedAt":"2026-08-08T15:39:37.999Z","sequence":[]},{"shoeId":"S1786203580348","updatedAt":"2026-08-08T16:42:43.165Z","sequence":["T","P","P","P","T","B","B","B","B","B","P","T","B","B","B","B","P","P","P","P","P","B","T","P","B","B","T","P","B","P","T","B","P","P","T","B","P","B","B","P","B","P","P","B","P","P","B","B","P","P","B","B","P","T","P","B","P","B","P","B"]},{"shoeId":"S1786207390938","updatedAt":"2026-08-09T01:34:52.523Z","sequence":["P","B","P","B","B","B","P","P","B","P","P","P","P","P","P","B","T","B","B","P","T","B","P","B","B","B","P","P","P","P","B","B","B","B","P","P","B","P","P","T","T","T","B","B","P","P","P","B","P"]},{"shoeId":"S1786239336584","updatedAt":"2026-08-09T02:30:40.163Z","sequence":["P","B","B","P","P","P","P","P","T","B","T","P","P","P","T","P","P","T","B","B","B","B","P","B","B","T","P","B","B","P"]},{"shoeId":"S1786243128374","updatedAt":"2026-08-09T03:02:17.180Z","sequence":["B","P","B","P","B","B","B","P","B","B","P","T","P","B","B","B","P","B","B","B","P","P","P","T","P","B","P","P","T","B","B","P","B","P","B","P","B","P","P","P","P","T","P","B","B","B","T"]},{"shoeId":"S1786244574861","updatedAt":"2026-08-09T06:36:40.298Z","sequence":["B","P","T","P","B","B","B","P","B","P","P","P","P","B","P","B","P","B","B","B","P","P","B","P","B","B","P","P","B","P","T","P","P","P","P","B","B","T","B","B","B","T","B","B","P","P","P","P","P","B","P","B","B","P","P","B","B","B","P","B","T","P","B","P","B","P","P","P","T"]},{"shoeId":"S1786257419177","updatedAt":"2026-08-09T07:15:18.885Z","sequence":["B","B","B","P","P","P","P","B","B","B","T","B","P","B","B","P","P","P","P","B","B","P","P","P","B","P","B","T","B","B","T","B","B","P","B","B","P","B","P","B","B","B","B","P","P","P","B","P","P","B","B","P","P","B","P","P","P","B","T","B","P","B","T","P","T","P","P","B"]},{"shoeId":"S1786260369369","updatedAt":"2026-08-09T07:26:09.370Z","sequence":[]},{"shoeId":"S1786260370303","updatedAt":"2026-08-09T07:31:20.084Z","sequence":["P","B","P","B","P","B","B","B","P","P","B","P","B","B","B","B","P","P","P","B","B","P","B","B","B","P","B","P","B","P","P","P","P","B","B","B","P","B","P","B","B"]},{"shoeId":"S1786260688698","updatedAt":"2026-08-09T07:33:55.620Z","sequence":["P","P","P","P","B","P","P","B","B","P","P","B","B","P","T","B","B","P","T","T","B","B","T","P","B","T","B","B","T","P","B","B","B","T","T","B","B","B","P","P"]},{"shoeId":"S1786260846892","updatedAt":"2026-08-09T07:34:06.892Z","sequence":[]},{"shoeId":"S1786260848225","updatedAt":"2026-08-09T07:35:27.347Z","sequence":["P","P","B","B","P","P","T","P","P","B","P","B","P","B","P","B","B","P","P","P","P","P","P","P","P","P","B","T","B","B","P","B","B","P","P"]},{"shoeId":"S1786260942517","updatedAt":"2026-08-09T07:38:43.193Z","sequence":["B","B","P","P","B","P","B","B","B","B","P","P","P","B","B","P","B","B","B","P","B","P","B","P","P","P","P","B","B","B","P","B","P","B","B","P","B","B","P","B","B","B","P","B","P"]},{"shoeId":"S1786261145489","updatedAt":"2026-08-09T07:40:34.576Z","sequence":["P","P","B","B","P","P","T","P","P","B","P","B","P","B","P","B","B","P","P","P","P","P","P","P","P","P","B","T","B","B","P","B","B","P","P","B","B","B","P","P","P","B"]}],"hands":[{"time":"2026-08-08T03:41:11.652Z","shoeId":"S1786160375765","handNo":39,"prediction":"B","confidence":57,"actual":"T","hit":false,"signature":"PBPBBB|L3|PBPB|PPPB|PPBB","factors":[{"id":"recentBias","name":"最近10局偏向","w":1,"v":0,"impact":0},{"id":"streak","name":"連莊／連閒延續","w":0.9,"v":0.75,"impact":0.675},{"id":"alternation","name":"單跳／交替","w":0.8,"v":0,"impact":0},{"id":"bigRoad","name":"大路結構","w":1.1,"v":0.45,"impact":0.49500000000000005},{"id":"eye","name":"大眼仔","w":0.85,"v":0.35,"impact":0.2975},{"id":"small","name":"小路","w":0.8,"v":0.3,"impact":0.24},{"id":"cock","name":"曱甴路","w":0.75,"v":0.25,"impact":0.1875},{"id":"similar","name":"歷史相似局面","w":1.25,"v":0,"impact":0}],"id":1}],"factorStats":[{"factorId":"alternation","wins":194,"losses":155,"samples":349,"weight":1.381476323119777},{"factorId":"bigRoad","wins":799,"losses":818,"samples":1617,"weight":1.291241548862938},{"factorId":"cock","wins":807,"losses":701,"samples":1508,"weight":1.3523715415019764},{"factorId":"eye","wins":806,"losses":804,"samples":1610,"weight":1.300925925925926},{"factorId":"recentBias","wins":625,"losses":592,"samples":1217,"weight":1.3201711491442545},{"factorId":"similar","wins":884,"losses":700,"samples":1584,"weight":1.3865746549560853},{"factorId":"small","wins":814,"losses":756,"samples":1570,"weight":1.3275316455696202},{"factorId":"streak","wins":799,"losses":818,"samples":1617,"weight":1.291241548862938}]};
 
 async function preloadHistoryOnce(){
- // V29：不因舊旗標或已有資料而跳過。採「只補不覆蓋」合併，保留使用者現場資料。
- var flag=await reqP(tx('meta','readonly').get('V29_PRELOADED_HISTORY'));
+ var flag=await reqP(tx('meta','readonly').get('V28_PRELOADED_HISTORY'));
  if(flag&&flag.value==='done')return false;
- var imported=0, upgraded=0;
+ var existing=await allP('shoes');
+ if(existing.length){
+   await reqP(tx('meta','readwrite').put({key:'V28_PRELOADED_HISTORY',value:'skipped_existing',updatedAt:nowIso()}));
+   return false;
+ }
  for(const s of (PRELOADED_HISTORY.shoes||[])){
-   if(!s || !s.shoeId || !Array.isArray(s.sequence) || !s.sequence.length)continue;
-   var old=await reqP(tx('shoes','readonly').get(s.shoeId));
-   if(!old){ await reqP(tx('shoes','readwrite').put(s)); imported++; }
-   else if(Array.isArray(old.sequence) && s.sequence.length>old.sequence.length){
-     await reqP(tx('shoes','readwrite').put(s)); upgraded++;
-   }
+   if(s && s.shoeId && Array.isArray(s.sequence)) await reqP(tx('shoes','readwrite').put(s));
  }
- // hands 用內容指紋去重，避免每次匯入重複灌入。
- var existingHands=await allP('hands');
- var handKeys=new Set(existingHands.map(handFingerprint));
- for(const h0 of (PRELOADED_HISTORY.hands||[])){
-   if(!h0)continue;
-   var k=handFingerprint(h0); if(handKeys.has(k))continue;
-   var h=Object.assign({},h0); delete h.id;
-   await reqP(tx('hands','readwrite').add(h)); handKeys.add(k);
+ for(const h of (PRELOADED_HISTORY.hands||[])){
+   if(h && h.id!=null) await reqP(tx('hands','readwrite').put(h));
+   else if(h) await reqP(tx('hands','readwrite').add(h));
  }
- // factorStats 保留樣本較多的一份，避免舊資料覆蓋較新的學習成果。
  for(const f of (PRELOADED_HISTORY.factorStats||[])){
-   if(!f || !f.factorId)continue;
-   var oldf=await reqP(tx('factorStats','readonly').get(f.factorId));
-   if(!oldf || (f.samples||0)>(oldf.samples||0)) await reqP(tx('factorStats','readwrite').put(f));
+   if(f && f.factorId) await reqP(tx('factorStats','readwrite').put(f));
  }
- await reqP(tx('meta','readwrite').put({key:'V29_PRELOADED_HISTORY',value:'done',sourceVersion:PRELOADED_HISTORY.version||'unknown',sourceExportedAt:PRELOADED_HISTORY.exportedAt||null,importedShoes:imported,upgradedShoes:upgraded,updatedAt:nowIso()}));
- return imported>0||upgraded>0;
+ await reqP(tx('meta','readwrite').put({
+   key:'V28_PRELOADED_HISTORY',
+   value:'done',
+   sourceVersion:PRELOADED_HISTORY.version||'unknown',
+   sourceExportedAt:PRELOADED_HISTORY.exportedAt||null,
+   importedShoes:(PRELOADED_HISTORY.shoes||[]).length,
+   updatedAt:nowIso()
+ }));
+ return true;
 }
 
-function handFingerprint(h){
- return [h.shoeId||'',h.handNo==null?'':h.handNo,h.prediction||'',h.actual||'',h.time||'',h.signature||''].join('|');
-}
 
 var FACTORS=[
  {id:'recentBias',name:'最近10局偏向',base:1.00},
@@ -265,15 +260,27 @@ function big(seq){
  });
  return out;
 }
+// === V29.2 STANDARD ROAD CORE — LOCKED ===
+// 下三路只由大路衍生；B=紅色結構點、P=藍色結構點，絕不代表莊/閒。
+// off=1 大眼仔、off=2 小路、off=3 曱甴路。
+// 新柱(row=0)：比較前一柱與再往前 off 柱的深度是否相同。
+// 同柱(row>0)：在參考柱比較「同列」與「上一列」是否同為有/無格；相同=紅，不同=藍。
+const ROAD_CORE_VERSION='STD_DERIVED_V1';
 function heights(c){var h={};c.forEach(x=>h[x.col]=Math.max(h[x.col]||0,x.row+1));return h}
 function occMap(c){var o={};c.forEach(x=>o[x.row+','+x.col]=1);return o}
-function signals(c,off){
+function derivedSignalsStandard(c,off){
  var s=[],h=heights(c),o=occMap(c);
  c.forEach(function(x){
-  var enough=x.row===0?x.col>=off+1:x.col>=off;if(!enough)return;
-  var red;
-  if(x.row===0) red=(h[x.col-1]||0)===(h[x.col-1-off]||0);
-  else red=(!!o[x.row+','+(x.col-off)])===(!!o[(x.row-1)+','+(x.col-off)]);
+  var enough=x.row===0?x.col>=off+1:x.col>=off;
+  if(!enough)return;
+  var red=false;
+  if(x.row===0){
+   red=(h[x.col-1]||0)===(h[x.col-1-off]||0);
+  }else{
+   var sameRow=!!o[x.row+','+(x.col-off)];
+   var aboveRow=!!o[(x.row-1)+','+(x.col-off)];
+   red=sameRow===aboveRow;
+  }
   s.push(red?'B':'P');
  });
  return s;
@@ -291,7 +298,29 @@ function marker(s){
  });
  return cells;
 }
-function roadData(seq){var b=big(seq);return{bead:bead(seq),big:b,eye:marker(signals(b,1)),small:marker(signals(b,2)),cock:marker(signals(b,3))}}
+function roadData(seq){
+ var b=big(seq);
+ return{bead:bead(seq),big:b,eye:marker(derivedSignalsStandard(b,1)),small:marker(derivedSignalsStandard(b,2)),cock:marker(derivedSignalsStandard(b,3))};
+}
+// 固定回歸測試：任何未來升版若動到大路/下三路核心，啟動時直接報錯，不允許靜默變形。
+function roadCoreSelfTest(){
+ var tests=[
+  {seq:'BPBPBPBP',eye:'BBBBBB',small:'BBBBB',cock:'BBBB'},
+  {seq:'BBPBBPBBP',eye:'PPPPPP',small:'BBBBB',cock:'PPP'},
+  {seq:'BBBPBPPBBP',eye:'PBPPBB',small:'PPPPP',cock:'BPPP'},
+  {seq:'BBBPPBBBBPBB',eye:'BPBPBPPP',small:'BBPPPB',cock:'PB'}
+ ];
+ for(var i=0;i<tests.length;i++){
+  var t=tests[i],b=big(t.seq.split(''));
+  var e=derivedSignalsStandard(b,1).join('');
+  var sm=derivedSignalsStandard(b,2).join('');
+  var c=derivedSignalsStandard(b,3).join('');
+  if(e!==t.eye||sm!==t.small||c!==t.cock){
+   return{ok:false,index:i+1,got:[e,sm,c],expected:[t.eye,t.small,t.cock]};
+  }
+ }
+ return{ok:true,version:ROAD_CORE_VERSION,tests:tests.length};
+}
 function drawRoad(id,cells,fill){
  var el=$(id);el.innerHTML='';
  cells.forEach(function(c){
@@ -640,6 +669,9 @@ async function historicalCross(seq){
  var hypB=transition(seq,'B'),hypP=transition(seq,'P');
  var sumB=0,sumP=0,sumT=0,total=0,eff=0,tieNear=0,tieNearW=0;
  var route={big:{B:0,P:0},eye:{B:0,P:0},small:{B:0,P:0},cock:{B:0,P:0}};
+ // Separate evidence for the current road and the road after a switch.
+ var roadNow={sameW:0,switchW:0,samples:0};
+ var roadNext={returnW:0,stayW:0,samples:0};
  var matches=[];
 
  for(const sh of uniq){
@@ -671,6 +703,20 @@ async function historicalCross(seq){
    var structural=actual===histLast?'SAME':'SWITCH';
    var mapped=structural==='SAME'?currentLast:opposite(currentLast);
    if(mapped==='B')sumB+=w; else sumP+=w;
+
+   roadNow.samples++;
+   if(structural==='SAME')roadNow.sameW+=w; else roadNow.switchW+=w;
+
+   // Two-step road forecast: only after a real switch, inspect the next B/P result.
+   // T is skipped because it does not start a new big-road column.
+   if(structural==='SWITCH'){
+    var j=i+1, second=null;
+    while(j<a.length){if(a[j]==='B'||a[j]==='P'){second=a[j];break;}j++;}
+    if(second){
+     roadNext.samples++;
+     if(second===histLast)roadNext.returnW+=w; else roadNext.stayW+=w;
+    }
+   }
 
    var htr=transition(prior,actual);
    ['big','eye','small','cock'].forEach(k=>{
@@ -709,7 +755,20 @@ async function historicalCross(seq){
                 (bp && Math.abs(histSame-.5)<.04)?'DOWNWEIGHT':'KEEP';
 
  matches.sort((x,y)=>y.sim-x.sim);
+ var nowTotal=roadNow.sameW+roadNow.switchW;
+ var nextTotal=roadNext.returnW+roadNext.stayW;
+ var currentRoadStats={
+  side:currentLast, samples:roadNow.samples,
+  continueRate:nowTotal?roadNow.sameW/nowTotal:.5,
+  switchRate:nowTotal?roadNow.switchW/nowTotal:.5
+ };
+ var nextRoadStats={
+  returnSide:currentLast, switchSide:opposite(currentLast), samples:roadNext.samples,
+  returnRate:nextTotal?roadNext.returnW/nextTotal:.5,
+  stayRate:nextTotal?roadNext.stayW/nextTotal:.5
+ };
  return{samples:eff,weighted:total,bRate:bRate,tieRate:tieRate,route:routeOut,
+  currentRoadStats:currentRoadStats,nextRoadStats:nextRoadStats,
   correction:correction,raw:raw,histStructural:histStructural,routeClass:f.cls,matches:matches.slice(0,20)};
 }
 
@@ -724,8 +783,6 @@ function factorWeight(id){
  var rate=(x.wins+5)/(x.samples+10);
  return Math.max(.45,Math.min(1.75,0.55+rate*1.5));
 }
-async function similarStats(sig){return{samples:0,b:0,p:0,bRate:.5}}
-
 function currentSegmentStats(cross,routeMem){
  // 目前路段勝率 = 同類相似歷史節點中「主方向」的可重現命中率。
  // 用 Beta(8,8) 收縮到 50%，避免極少樣本出現 90~100% 的假高勝率。
@@ -742,61 +799,6 @@ function currentSegmentStats(cross,routeMem){
    if(routeMem.samples<8)liveLabel+='（樣本少）';
  }
  return{samples:n,rate:rate,side:side,label:label,liveLabel:liveLabel};
-}
-
-function betaShrinkRate(rate,n,priorEach){
- priorEach=priorEach==null?10:priorEach;
- var wins=Math.max(0,Math.min(n,rate*n));
- return (wins+priorEach)/(n+priorEach*2);
-}
-
-function effectiveBetSupport(side,cross){
- if(!cross||!cross.samples||!(side==='B'||side==='P'))return{samples:0,rate:.5,raw:.5};
- var raw=side==='B'?cross.bRate:1-cross.bRate;
- return{samples:cross.samples,rate:betaShrinkRate(raw,cross.samples,12),raw:raw};
-}
-
-function thisRoadPredictionStats(seq,cross,bpCross){
- var rr=runsOf(seq); if(!rr.length)return{samples:0,label:'樣本不足'};
- var cur=rr[rr.length-1], n=0, continueRate=.5;
- if(bpCross&&bpCross.samples){n=bpCross.samples;continueRate=bpCross.continueProb;}
- else if(cross&&cross.samples){n=cross.samples;continueRate=cur.side==='B'?cross.bRate:1-cross.bRate;}
- if(!n)return{samples:0,label:'樣本不足'};
- var adj=betaShrinkRate(continueRate,n,10);
- var continueSide=cur.side, breakSide=opposite(cur.side);
- var side=adj>=.5?continueSide:breakSide, rate=Math.max(adj,1-adj);
- var action=side===continueSide?'續':'斷';
- var zh=side==='B'?'莊':'閒';
- return{samples:n,rate:rate,side:side,action:action,label:(n<8?'樣本不足｜':'')+action+zh+' '+(rate*100).toFixed(1)+'%｜'+n+'樣本'};
-}
-
-async function nextRoadPredictionStats(seq){
- // 預測「目前這段路斷掉後，下一段的第一個延續/回切」；使用去重後歷史相似節點。
- var rr=runsOf(seq); if(!rr.length)return{samples:0,label:'樣本不足'};
- var currentSide=rr[rr.length-1].side, f=feature(seq);
- var shoes=cleanHistoricalShoes(await allP('shoes'));
- var sameW=0, backW=0, n=0;
- for(const sh of shoes){
-   var a=sh.sequence||[];
-   for(var i=6;i<a.length-1;i++){
-     var prior=a.slice(0,i), pf=feature(prior), sim=featureSimilarity(f,pf);
-     if(sim<.60)continue;
-     var pl=runsOf(prior).slice(-1)[0]; if(!pl)continue;
-     var first=a[i]; if(first!=='B'&&first!=='P')continue;
-     if(first===pl.side)continue; // 只研究已經斷路、進入下一段的案例
-     var j=i+1; while(j<a.length && a[j]==='T')j++; if(j>=a.length)continue;
-     var second=a[j]; if(second!=='B'&&second!=='P')continue;
-     var w=Math.pow((sim-.50)/.50,2.2); if(w<=0)continue;
-     n++; if(second===first)sameW+=w; else backW+=w;
-   }
- }
- var z=sameW+backW; if(!z)return{samples:0,label:'樣本不足'};
- var nextNewSide=opposite(currentSide);
- var cont=z?sameW/z:.5; var adj=betaShrinkRate(cont,n,10);
- var predictedSide=adj>=.5?nextNewSide:currentSide;
- var rate=Math.max(adj,1-adj), zh=predictedSide==='B'?'莊':'閒';
- var action=predictedSide===nextNewSide?'新路續':'新路回切';
- return{samples:n,rate:rate,side:predictedSide,action:action,label:(n<8?'樣本不足｜':'')+action+zh+' '+(rate*100).toFixed(1)+'%｜'+n+'樣本'};
 }
 
 function factorSignals(seq,sim){
@@ -948,7 +950,10 @@ function evidenceConfidence(cross,bpCross,routeMem,bProb){
 
 async function calibrateConfidence(rawC){
  var hands=await allP('hands');
- var rows=hands.filter(h=>h&&typeof h.confidence==='number'&&typeof h.hit==='boolean');
+ var rows=hands.filter(h=>h&&typeof h.confidence==='number'&&(typeof h.hit==='boolean'||typeof h.shadowHit==='boolean')).map(function(h){
+  if(typeof h.hit==='boolean')return h;
+  var x=Object.assign({},h);x.hit=h.shadowHit;return x;
+ });
 
  // 完全不使用「最近幾局是否連贏」。
  // 只使用長期同信心區間實際命中率做校準。
@@ -987,13 +992,11 @@ async function calibrateConfidence(rawC){
 }
 
 async function analyze(seq){
- if(seq.filter(x=>x!=='T').length<6)return{b:47,p:47,t:6,c:0,call:'PASS',candidate:'PASS',effective:{samples:0,rate:.5},sim:{samples:0},cross:null,factors:{}};
+ if(seq.filter(x=>x!=='T').length<6)return{b:47,p:47,t:6,c:0,call:'PASS',sim:{samples:0},directionalRate:50,decisionScore:0,betTier:'觀察',directionSide:null,cross:null,factors:{}};
  var cross=await historicalCross(seq), route=cross.route||{};
  var routeMem=await routeCorrectionMemory(cross.routeClass);
  var bpCross=await breakpointCross(seq), bpAdj=breakpointAdjustment(bpCross);
  var reflection=independentReflection(cross,bpCross,routeMem);
- var thisRoadStats=thisRoadPredictionStats(seq,cross,bpCross);
- var nextRoadStats=await nextRoadPredictionStats(seq);
  var pieces=[], num=0,den=0;
  function add(name,obj,base){
   if(!obj)return;
@@ -1059,28 +1062,43 @@ async function analyze(seq){
 
  // 再使用已累積的「信心區間 vs 真實命中率」做校準。
  c=await calibrateConfidence(c);
- var minGap=c>=85?5.0:c>=75?4.2:3.5;
- var candidate=(c>=55&&gap>=minGap)?(b>50?'B':'P'):'PASS';
+ // V29.0：下注門檻統一。60 以下就是觀察，60 以上才進入可下注區。
+ // 方向勝率使用 B/P 條件機率（不含和局），避免和局機率把 60% 訊號壓成表面 56% 而造成判讀矛盾。
+ var directionalRate=Math.max(b,100-b);
+ var directionSide=b>=50?'B':'P';
+ var decisionScore=Math.min(c,directionalRate);
+ var enoughDecisionSample=cross.samples>=8;
+ var call=(enoughDecisionSample && decisionScore>=60)?directionSide:'PASS';
 
- // 和局機率獨立顯示；「本局下注」只由 B/P 可驗證歷史支持決定。
+ // 和局最終機率直接使用經樣本量校正後的歷史相似路結果，不再硬鎖 22%。
  var tProb=Math.max(2.0,cross.tieRate*100);
  var nonTie=100-tProb;
  var bFinal=(b/100)*nonTie;
  var pFinal=nonTie-bFinal;
 
- // 最終下注硬門檻：有效歷史勝率 >= 60%，相似樣本 >= 20。
- // 模型信心只代表訊號一致度，不能單獨觸發下注；下一條路預判也不參與本局方向。
- var effective=effectiveBetSupport(candidate,cross);
- var call=(candidate!=='PASS' && effective.samples>=20 && effective.rate>=.60)?candidate:'PASS';
+ // T only becomes formal call when historical similar-route tie probability is exceptionally high
+ // and there are enough matching nodes; otherwise display probability only.
+ // 正式叫 T：需要足夠相似樣本，且和局必須明顯高於該路型的基準和率。
+ var tieCallThreshold=17;
+ if(cross.samples>=60) tieCallThreshold=Math.max(13,Math.min(18,(cross.tieRate*100)*.78));
+ else if(cross.samples>=35) tieCallThreshold=16;
+ if(cross.samples>=35 && tProb>=tieCallThreshold && tProb>bFinal && tProb>pFinal) call='T';
+
+ // 統一顯示層級：60 可下注、65 優勢、70 高勝率。
+ // 若樣本不足，不把小樣本高百分比標成可下注。
+ var betTier='觀察';
+ if(enoughDecisionSample && decisionScore>=70) betTier='高勝率';
+ else if(enoughDecisionSample && decisionScore>=65) betTier='優勢下注';
+ else if(enoughDecisionSample && decisionScore>=60) betTier='可下注';
+ if(!enoughDecisionSample) betTier='樣本不足';
 
  cross.routeMemory=routeMem;
  cross.segmentStats=currentSegmentStats(cross,routeMem);
- cross.thisRoadStats=thisRoadStats;
- cross.nextRoadStats=nextRoadStats;
  cross.breakpointCross=bpCross;
  cross.breakpointAdjustment=bpAdj;
  cross.reflection=reflection;
- return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,candidate:candidate,effective:effective,sim:{samples:cross.samples,bRate:cross.bRate},
+ return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,sim:{samples:cross.samples,bRate:cross.bRate},
+  directionalRate:directionalRate,decisionScore:decisionScore,betTier:betTier,directionSide:directionSide,
   cross:cross,factors:pieces,signature:signature(seq)};
 }
 
@@ -1099,10 +1117,18 @@ async function settlePending(actual){
  if(!state.pendingPrediction)return;
  var p=state.pendingPrediction;
  await updateLearning(p,actual);
- if(p.call==='B'||p.call==='P'||p.call==='T'){
+ var shadow=(p.call==='B'||p.call==='P')?p.call:
+            (p.directionSide==='B'||p.directionSide==='P'?p.directionSide:null);
+ var meaningful=(p.call==='B'||p.call==='P'||p.call==='T'||shadow!==null||Number(p.c)>0);
+ if(meaningful){
   var rec={
    time:nowIso(),shoeId:state.shoeId,handNo:state.current.length,
-   prediction:p.call,confidence:p.c,actual:actual,hit:p.call===actual,
+   prediction:p.call||'PASS',confidence:Number(p.c)||0,actual:actual,
+   hit:(p.call==='B'||p.call==='P'||p.call==='T')?p.call===actual:null,
+   isPass:p.call==='PASS',shadowPrediction:shadow,
+   shadowHit:shadow?shadow===actual:null,
+   directionalRate:p.directionalRate||null,decisionScore:p.decisionScore||null,
+   betTier:p.betTier||null,
    signature:p.signature,factors:p.factors,
    correction:p.cross?p.cross.correction:null,
    routeClass:p.cross?p.cross.routeClass:null,
@@ -1118,13 +1144,12 @@ async function settlePending(actual){
 }
 async function backfillHistoricalLearning(force){
  // V28 不再用舊式勝敗回填來驅動預測；保留既有資料庫但標記新引擎已啟用。
- var result={key:'v27Backfill',value:'done',trainingSamples:0,updatedAt:nowIso(),engine:'V29_2_FULL_SYNC'};
+ var result={key:'v27Backfill',value:'done',trainingSamples:0,updatedAt:nowIso(),engine:'V28_ROUTE_CORRECTION'};
  await reqP(tx('meta','readwrite').put(result)); return result;
 }
 async function fuzzySimilarStats(seq){return historicalCross(seq)}
 
 async function saveShoe(){
- if(!state.shoeId)return false;
  var ok=await verifiedSaveShoe();
  if(ok)setTimeout(function(){autoCloudSync();},0);
  return ok;
@@ -1150,14 +1175,12 @@ async function refresh(){
  drawRoad('bead',rd.bead,true);drawRoad('big',rd.big,false);drawRoad('eye',rd.eye,true);drawRoad('small',rd.small,true);drawRoad('cock',rd.cock,true);
  var c={B:0,P:0,T:0};state.current.forEach(x=>c[x]++);
  $('hands').textContent=state.current.length;$('bpt').textContent=c.B+' / '+c.P+' / '+c.T;
- syncManualSequence();
  var a=await analyze(state.current);
  $('bPct').textContent=a.b.toFixed(1)+'%';$('pPct').textContent=a.p.toFixed(1)+'%';$('tPct').textContent=(a.t||0).toFixed(1)+'%';$('conf').textContent=a.c+'%';$('similar').textContent=a.sim.samples||0;
- var eff=a.effective||{samples:0,rate:.5};
- var effText=eff.samples?(eff.rate*100).toFixed(1)+'%｜'+eff.samples+'樣本':'—';
- var betSide=a.call==='B'?'莊':a.call==='P'?'閒':'PASS';
- $('call').textContent=a.call==='PASS'?'本局：PASS｜有效勝率 '+effText+'｜不下注':'本局下注：'+betSide+'｜有效勝率 '+effText+'｜可下注';
- $('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':'#53627a';
+ var liveSide=a.call==='B'?'莊':a.call==='P'?'閒':a.call==='T'?'和':'PASS';
+ var liveRate=(a.call==='PASS'||!a.decisionScore)?'—':a.decisionScore.toFixed(1)+'%';
+ $('call').textContent='本局：'+liveSide+'｜有效勝率 '+liveRate+'｜'+(a.call==='PASS'?'不下注':'可下注');
+ $('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':a.call==='T'?'#20a36a':'#53627a';
  var histText='尚無資料', histRate=null, histSide='';
  if(a.sim&&a.sim.samples){
    if(a.call==='B'){histRate=a.sim.bRate;histSide='莊';}
@@ -1171,19 +1194,27 @@ async function refresh(){
  var cx=a.cross;
  var seg=(cx&&cx.segmentStats)?cx.segmentStats:null;
  $('segmentWin').textContent=seg?seg.label:'樣本不足';
- var thisRoad=(cx&&cx.thisRoadStats)?cx.thisRoadStats:null;
- var nextRoad=(cx&&cx.nextRoadStats)?cx.nextRoadStats:null;
- $('thisRoadWin').textContent=thisRoad?thisRoad.label:'樣本不足';
- $('nextRoadWin').textContent=nextRoad?nextRoad.label:'樣本不足';
+ var cr=cx&&cx.currentRoadStats?cx.currentRoadStats:null;
+ if(cr&&cr.samples>=8){
+  var crSide=cr.side==='B'?'莊':'閒';
+  $('currentRoadWin').textContent='續'+crSide+' '+(cr.continueRate*100).toFixed(1)+'%｜'+cr.samples+'樣本';
+ }else $('currentRoadWin').textContent='樣本不足';
+ var nr=cx&&cx.nextRoadStats?cx.nextRoadStats:null;
+ if(nr&&nr.samples>=8){
+  var nrSide=nr.returnSide==='B'?'莊':'閒';
+  $('nextRoadWin').textContent='新路回切'+nrSide+' '+(nr.returnRate*100).toFixed(1)+'%｜'+nr.samples+'樣本';
+ }else $('nextRoadWin').textContent='樣本不足';
  $('segmentLive').textContent=seg?seg.liveLabel:'尚無資料';
- $('reason').textContent=(a.call==='PASS'?'本局有效歷史勝率未達 60% 或方向證據不足，PASS 不下注。':'本局有效歷史勝率已達 60%，依最終下注建議。')
+ var sideText=a.directionSide==='B'?'莊':a.directionSide==='P'?'閒':'—';
+ var grade=a.betTier||'觀察';
+ $('betGrade').textContent=grade+(a.directionalRate?('｜'+sideText+' '+a.directionalRate.toFixed(1)+'%'):'');
+ $('betGrade').style.color=grade==='高勝率'?'#7CFC9A':grade==='優勢下注'?'#9BE15D':grade==='可下注'?'#ffd166':'#aab5c5';
+ $('reason').textContent=(a.call==='PASS'?'未達統一 60 分門檻或樣本不足，PASS。':'已達統一下注門檻。')
    +(cx?'｜路型 '+cx.routeClass+'｜相似節點 '+cx.samples+'｜錯誤校正 '+(cx.correction==='FLIP'?'已翻向':cx.correction==='DOWNWEIGHT'?'已降權':'保持')+'｜和局歷史 '+(cx.tieRate*100).toFixed(1)+'%':'')
    +(cx&&cx.breakpointAdjustment&&cx.breakpointAdjustment.label?'｜'+cx.breakpointAdjustment.label:'')
    +(a.sim&&a.sim.samples?'｜歷史'+histSide+'支持 '+(histRate*100).toFixed(1)+'%':'')
    +(seg&&seg.samples>=8?'｜目前路段歷史勝率 '+(seg.rate*100).toFixed(1)+'%（'+seg.side+'方向／'+seg.samples+'樣本）':'')
-   +(thisRoad&&thisRoad.samples>=8?'｜預測這條路 '+thisRoad.label:'')
-   +(nextRoad&&nextRoad.samples>=8?'｜預測下一條路 '+nextRoad.label:'')
-   +'｜模型信心僅代表訊號一致度，不等於下注勝率。預測下一條路只做後續路型預判，不是本局下注方向。';
+   +'｜B/P條件方向勝率 '+(a.directionalRate||50).toFixed(1)+'%｜統一判定分 '+(a.decisionScore||0).toFixed(1)+'%｜'+(a.betTier||'觀察')+'。60以下觀察；60–64.9可下注；65–69.9優勢下注；70以上高勝率。樣本不足不放行。';
  $('factorBox').innerHTML='';
  if(cx){
    var labels={big:'大路',eye:'大眼仔',small:'小路',cock:'曱甴路'};
@@ -1207,10 +1238,8 @@ async function refresh(){
 }
 async function updateDashboard(){
  var hands=await allP('hands'),shoes=await allP('shoes');
- var cleanShoes=cleanHistoricalShoes(shoes);
- var permanentHands=cleanShoes.reduce((s,x)=>s+(Array.isArray(x.sequence)?x.sequence.length:0),0); $('dbHands').textContent=permanentHands;
- $('dbShoes').textContent=cleanShoes.length;$('dbPred').textContent=hands.length;
- if($('modelVersion'))$('modelVersion').textContent='V29.2';
+ var permanentHands=shoes.reduce((s,x)=>s+(Array.isArray(x.sequence)?x.sequence.length:0),0); $('dbHands').textContent=permanentHands;
+ $('dbShoes').textContent=shoes.length;$('dbPred').textContent=hands.length;
  var hits=hands.filter(x=>x.hit===true).length;
  // V27.1: Current-analysis historical support is rendered from fuzzy similar samples in refresh().
  // Do not overwrite #acc here with the much smaller live-settled-prediction history.
@@ -1218,37 +1247,22 @@ async function updateDashboard(){
  var recent=hands.slice(-50).reverse();$('historyRows').innerHTML=recent.length?'':'<tr><td colspan="7">尚無紀錄</td></tr>';
  recent.forEach(function(x){
   var tr=document.createElement('tr');
-  tr.innerHTML='<td>'+new Date(x.time).toLocaleString()+'</td><td>'+x.shoeId.slice(-6)+'</td><td>'+x.handNo+'</td><td>'+x.prediction+'</td><td>'+x.actual+'</td><td>'+(x.hit?'✓':'✗')+'</td><td>'+x.confidence+'%</td>';
+  var aiLabel=x.prediction==='PASS'?(x.shadowPrediction?'PASS（偏'+x.shadowPrediction+'）':'PASS'):x.prediction;
+  var resultLabel=x.prediction==='PASS'?(typeof x.shadowHit==='boolean'?(x.shadowHit?'觀察✓':'觀察✗'):'觀察'):(x.hit?'✓':'✗');
+  tr.innerHTML='<td>'+new Date(x.time).toLocaleString()+'</td><td>'+String(x.shoeId||'').slice(-6)+'</td><td>'+x.handNo+'</td><td>'+aiLabel+'</td><td>'+x.actual+'</td><td>'+resultLabel+'</td><td>'+x.confidence+'%</td>';
   $('historyRows').appendChild(tr);
  });
 }
 async function exportDB(){
- var payload={version:'29.2',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
- var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V29_2_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+ var payload={version:'28.8',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V28_8_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importDB(file){
  var data=JSON.parse(await file.text());
- for(const s of (data.shoes||[])){
-   if(!s||!s.shoeId||!Array.isArray(s.sequence)||!s.sequence.length)continue;
-   var old=await reqP(tx('shoes','readonly').get(s.shoeId));
-   if(!old || !Array.isArray(old.sequence) || s.sequence.length>old.sequence.length) await reqP(tx('shoes','readwrite').put(s));
- }
- var oldHands=await allP('hands'), keys=new Set(oldHands.map(handFingerprint));
- for(const h0 of (data.hands||[])){
-   if(!h0)continue; var k=handFingerprint(h0); if(keys.has(k))continue;
-   var h=Object.assign({},h0); delete h.id; await reqP(tx('hands','readwrite').add(h)); keys.add(k);
- }
- for(const f of (data.factorStats||[])){
-   if(!f||!f.factorId)continue; var oldf=await reqP(tx('factorStats','readonly').get(f.factorId));
-   if(!oldf || (f.samples||0)>(oldf.samples||0)) await reqP(tx('factorStats','readwrite').put(f));
- }
- await loadFactorStats();await refresh();toast('備份已去重匯入');
-}
-
-function syncManualSequence(){
- if(!$('manualSeq'))return;
- $('manualSeq').value=state.current.join('');
- $('manualSeqInfo').textContent='目前鞋已同步 '+state.current.length+' 局';
+ for(const s of (data.shoes||[])) await reqP(tx('shoes','readwrite').put(s));
+ for(const h of (data.hands||[])) await reqP(tx('hands','readwrite').add(h));
+ for(const f of (data.factorStats||[])) await reqP(tx('factorStats','readwrite').put(f));
+ await loadFactorStats();await refresh();toast('備份已匯入');
 }
 
 function parseManualSequence(raw){
@@ -1258,23 +1272,22 @@ function parseManualSequence(raw){
 async function replaceWithManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- var old=state.current.slice();
- state.current=s.slice(); state.pendingPrediction=null;
- var ok=await saveShoe();
- if(!ok){state.current=old;syncManualSequence();return toast('保存失敗，未取代');}
- await refresh(); toast('已取代目前鞋：'+s.length+' 局');
+ state.current=s.slice();
+ state.pendingPrediction=null;
+ await saveShoe();
+ $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局';
+ await refresh();
+ toast('已取代目前鞋');
 }
 async function appendManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- var old=state.current.slice(), delta=s;
- var isPrefix=s.length>=old.length && old.every(function(x,i){return s[i]===x});
- if(isPrefix)delta=s.slice(old.length);
- if(!delta.length){syncManualSequence();return toast('沒有新增局數');}
- state.current=state.current.concat(delta); state.pendingPrediction=null;
- var ok=await saveShoe();
- if(!ok){state.current=old;syncManualSequence();return toast('保存失敗，未接續');}
- await refresh(); toast('已接續 '+delta.length+' 局，目前共 '+state.current.length+' 局');
+ state.current=state.current.concat(s);
+ state.pendingPrediction=null;
+ await saveShoe();
+ $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局';
+ await refresh();
+ toast('已接續目前鞋');
 }
 
 
@@ -1400,6 +1413,8 @@ function bindCloudUI(){
 }
 
 async function start(){
+ var coreCheck=roadCoreSelfTest();
+ if(!coreCheck.ok)throw new Error('路單核心自檢失敗 #'+coreCheck.index);
  await openDB();
  var preloaded=await preloadHistoryOnce();
  await loadFactorStats();
@@ -1426,7 +1441,7 @@ async function start(){
  $('manualSeq').oninput=function(){var s=parseManualSequence(this.value);$('manualSeqInfo').textContent=s.length?'已讀取 '+s.length+' 局':'尚未輸入序列。'};
  var bf=await backfillHistoricalLearning(false);await loadFactorStats();
  await refresh();
- toast((preloaded?'歷史路單已補齊｜':'')+'V29.2 已接續最後一鞋');
+ toast((preloaded?'歷史路單已自動匯入｜':'')+'V29.2 路單核心 '+ROAD_CORE_VERSION+' ✓');
 }
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
