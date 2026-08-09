@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V29.1 FULL SYNC</title>
+<title>AI PRO V29.2 FULL SYNC</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V29.1 FULL SYNC</h1>
+    <h1>AI PRO V29.2 FULL SYNC</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.1 FULL SYNC</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.2 FULL SYNC</div></div>
 </header>
 
 <section class="panel">
@@ -55,12 +55,12 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
   </div>
-  <p class="muted">V29.1 已內建 V28.8 歷史路單，首次開啟會自動匯入並接續最後一鞋；莊／閒／和三方機率由相似路型、正反路、下三路、歷史錯誤修正與樣本量動態決定；信心度會用實際命中紀錄再校準。歷史資料不再只累積勝敗。系統先把珠盤路轉成大路與下三路，再以路型、正反鏡像、柱高、單跳/雙跳/長龍/三顆斷/四顆斷等結構搜尋歷史相似節點；錯誤會直接改變同型路的下一次方向權重。T 和局獨立統計。</p>
+  <p class="muted">V29.2 已內建 V28.8 歷史路單，首次開啟會自動匯入並接續最後一鞋；莊／閒／和三方機率由相似路型、正反路、下三路、歷史錯誤修正與樣本量動態決定；信心度會用實際命中紀錄再校準。歷史資料不再只累積勝敗。系統先把珠盤路轉成大路與下三路，再以路型、正反鏡像、柱高、單跳/雙跳/長龍/三顆斷/四顆斷等結構搜尋歷史相似節點；錯誤會直接改變同型路的下一次方向權重。T 和局獨立統計。</p>
 </section>
 
 <section class="panel">
   <h2>手動序列輸入</h2>
-  <p class="muted">可直接貼上整串 B / P / T，例如：<b>BPPBTTPBBP</b>。空白、逗號、換行會自動忽略。</p>
+  <p class="muted">輸入框會同步目前整鞋。可貼完整 B/P/T；若在完整序列尾端新增後按「接續目前鞋」，只接續新增部分，不會把整鞋重複加入。</p>
   <textarea id="manualSeq" placeholder="例如：BPPBTTPBBP"></textarea>
   <div class="grid" style="margin-top:10px">
     <button id="replaceSeq">取代目前鞋</button>
@@ -78,15 +78,15 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div><b id="tPct">10.0%</b><span class="muted">和機率</span></div>
     <div><b id="conf">0%</b><span class="muted">模型信心（訊號一致度）</span></div>
   </div>
-  <div id="call" class="call">PASS</div>
+  <div id="call" class="call">本局：PASS｜有效勝率 —｜不下注</div>
   <div class="cards" style="margin-top:12px">
     <div class="card"><span class="muted">目前局數</span><b id="hands">0</b></div>
     <div class="card"><span class="muted">莊／閒／和</span><b id="bpt">0 / 0 / 0</b></div>
     <div class="card"><span class="muted">相似樣本</span><b id="similar">0</b></div>
     <div class="card"><span class="muted">相似局歷史支持</span><b id="acc">尚無資料</b></div>
     <div class="card"><span class="muted">目前路段勝率</span><b id="segmentWin">樣本不足</b></div>
-    <div class="card"><span class="muted">預測這條路勝率</span><b id="thisRoadWin">樣本不足</b></div>
-    <div class="card"><span class="muted">預測下一條路勝率</span><b id="nextRoadWin">樣本不足</b></div>
+    <div class="card"><span class="muted">預測這條路勝率（本局證據）</span><b id="thisRoadWin">樣本不足</b></div>
+    <div class="card"><span class="muted">預測下一條路勝率（後續預判，非本局下注）</span><b id="nextRoadWin">樣本不足</b></div>
     <div class="card"><span class="muted">同路型實戰命中</span><b id="segmentLive">尚無資料</b></div>
   </div>
   <p id="reason" class="muted"></p>
@@ -104,7 +104,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
     <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b id="modelVersion">V29.1</b></div>
+    <div class="card"><span class="muted">模型版本</span><b id="modelVersion">V29.2</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -750,6 +750,12 @@ function betaShrinkRate(rate,n,priorEach){
  return (wins+priorEach)/(n+priorEach*2);
 }
 
+function effectiveBetSupport(side,cross){
+ if(!cross||!cross.samples||!(side==='B'||side==='P'))return{samples:0,rate:.5,raw:.5};
+ var raw=side==='B'?cross.bRate:1-cross.bRate;
+ return{samples:cross.samples,rate:betaShrinkRate(raw,cross.samples,12),raw:raw};
+}
+
 function thisRoadPredictionStats(seq,cross,bpCross){
  var rr=runsOf(seq); if(!rr.length)return{samples:0,label:'樣本不足'};
  var cur=rr[rr.length-1], n=0, continueRate=.5;
@@ -981,7 +987,7 @@ async function calibrateConfidence(rawC){
 }
 
 async function analyze(seq){
- if(seq.filter(x=>x!=='T').length<6)return{b:47,p:47,t:6,c:0,call:'PASS',sim:{samples:0},cross:null,factors:{}};
+ if(seq.filter(x=>x!=='T').length<6)return{b:47,p:47,t:6,c:0,call:'PASS',candidate:'PASS',effective:{samples:0,rate:.5},sim:{samples:0},cross:null,factors:{}};
  var cross=await historicalCross(seq), route=cross.route||{};
  var routeMem=await routeCorrectionMemory(cross.routeClass);
  var bpCross=await breakpointCross(seq), bpAdj=breakpointAdjustment(bpCross);
@@ -1054,21 +1060,18 @@ async function analyze(seq){
  // 再使用已累積的「信心區間 vs 真實命中率」做校準。
  c=await calibrateConfidence(c);
  var minGap=c>=85?5.0:c>=75?4.2:3.5;
- var call=(c>=55&&gap>=minGap)?(b>50?'B':'P'):'PASS';
+ var candidate=(c>=55&&gap>=minGap)?(b>50?'B':'P'):'PASS';
 
- // 和局最終機率直接使用經樣本量校正後的歷史相似路結果，不再硬鎖 22%。
+ // 和局機率獨立顯示；「本局下注」只由 B/P 可驗證歷史支持決定。
  var tProb=Math.max(2.0,cross.tieRate*100);
  var nonTie=100-tProb;
  var bFinal=(b/100)*nonTie;
  var pFinal=nonTie-bFinal;
 
- // T only becomes formal call when historical similar-route tie probability is exceptionally high
- // and there are enough matching nodes; otherwise display probability only.
- // 正式叫 T：需要足夠相似樣本，且和局必須明顯高於該路型的基準和率。
- var tieCallThreshold=17;
- if(cross.samples>=60) tieCallThreshold=Math.max(13,Math.min(18,(cross.tieRate*100)*.78));
- else if(cross.samples>=35) tieCallThreshold=16;
- if(cross.samples>=35 && tProb>=tieCallThreshold && tProb>bFinal && tProb>pFinal) call='T';
+ // 最終下注硬門檻：有效歷史勝率 >= 60%，相似樣本 >= 20。
+ // 模型信心只代表訊號一致度，不能單獨觸發下注；下一條路預判也不參與本局方向。
+ var effective=effectiveBetSupport(candidate,cross);
+ var call=(candidate!=='PASS' && effective.samples>=20 && effective.rate>=.60)?candidate:'PASS';
 
  cross.routeMemory=routeMem;
  cross.segmentStats=currentSegmentStats(cross,routeMem);
@@ -1077,7 +1080,7 @@ async function analyze(seq){
  cross.breakpointCross=bpCross;
  cross.breakpointAdjustment=bpAdj;
  cross.reflection=reflection;
- return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,sim:{samples:cross.samples,bRate:cross.bRate},
+ return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,candidate:candidate,effective:effective,sim:{samples:cross.samples,bRate:cross.bRate},
   cross:cross,factors:pieces,signature:signature(seq)};
 }
 
@@ -1115,15 +1118,16 @@ async function settlePending(actual){
 }
 async function backfillHistoricalLearning(force){
  // V28 不再用舊式勝敗回填來驅動預測；保留既有資料庫但標記新引擎已啟用。
- var result={key:'v27Backfill',value:'done',trainingSamples:0,updatedAt:nowIso(),engine:'V29_FULL_SYNC'};
+ var result={key:'v27Backfill',value:'done',trainingSamples:0,updatedAt:nowIso(),engine:'V29_2_FULL_SYNC'};
  await reqP(tx('meta','readwrite').put(result)); return result;
 }
 async function fuzzySimilarStats(seq){return historicalCross(seq)}
 
 async function saveShoe(){
- if(!state.shoeId)return;
- await reqP(tx('shoes','readwrite').put({shoeId:state.shoeId,updatedAt:nowIso(),sequence:state.current.slice()}));
- setTimeout(function(){autoCloudSync();},0);
+ if(!state.shoeId)return false;
+ var ok=await verifiedSaveShoe();
+ if(ok)setTimeout(function(){autoCloudSync();},0);
+ return ok;
 }
 async function addResult(r){
  await settlePending(r);
@@ -1146,10 +1150,14 @@ async function refresh(){
  drawRoad('bead',rd.bead,true);drawRoad('big',rd.big,false);drawRoad('eye',rd.eye,true);drawRoad('small',rd.small,true);drawRoad('cock',rd.cock,true);
  var c={B:0,P:0,T:0};state.current.forEach(x=>c[x]++);
  $('hands').textContent=state.current.length;$('bpt').textContent=c.B+' / '+c.P+' / '+c.T;
+ syncManualSequence();
  var a=await analyze(state.current);
  $('bPct').textContent=a.b.toFixed(1)+'%';$('pPct').textContent=a.p.toFixed(1)+'%';$('tPct').textContent=(a.t||0).toFixed(1)+'%';$('conf').textContent=a.c+'%';$('similar').textContent=a.sim.samples||0;
- $('call').textContent=a.call==='B'?'B 莊':a.call==='P'?'P 閒':a.call==='T'?'T 和':'PASS';
- $('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':a.call==='T'?'#20a36a':'#53627a';
+ var eff=a.effective||{samples:0,rate:.5};
+ var effText=eff.samples?(eff.rate*100).toFixed(1)+'%｜'+eff.samples+'樣本':'—';
+ var betSide=a.call==='B'?'莊':a.call==='P'?'閒':'PASS';
+ $('call').textContent=a.call==='PASS'?'本局：PASS｜有效勝率 '+effText+'｜不下注':'本局下注：'+betSide+'｜有效勝率 '+effText+'｜可下注';
+ $('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':'#53627a';
  var histText='尚無資料', histRate=null, histSide='';
  if(a.sim&&a.sim.samples){
    if(a.call==='B'){histRate=a.sim.bRate;histSide='莊';}
@@ -1168,14 +1176,14 @@ async function refresh(){
  $('thisRoadWin').textContent=thisRoad?thisRoad.label:'樣本不足';
  $('nextRoadWin').textContent=nextRoad?nextRoad.label:'樣本不足';
  $('segmentLive').textContent=seg?seg.liveLabel:'尚無資料';
- $('reason').textContent=(a.call==='PASS'?'訊號不足，建議 PASS。':'以相似路型歷史交叉演算。')
+ $('reason').textContent=(a.call==='PASS'?'本局有效歷史勝率未達 60% 或方向證據不足，PASS 不下注。':'本局有效歷史勝率已達 60%，依最終下注建議。')
    +(cx?'｜路型 '+cx.routeClass+'｜相似節點 '+cx.samples+'｜錯誤校正 '+(cx.correction==='FLIP'?'已翻向':cx.correction==='DOWNWEIGHT'?'已降權':'保持')+'｜和局歷史 '+(cx.tieRate*100).toFixed(1)+'%':'')
    +(cx&&cx.breakpointAdjustment&&cx.breakpointAdjustment.label?'｜'+cx.breakpointAdjustment.label:'')
    +(a.sim&&a.sim.samples?'｜歷史'+histSide+'支持 '+(histRate*100).toFixed(1)+'%':'')
    +(seg&&seg.samples>=8?'｜目前路段歷史勝率 '+(seg.rate*100).toFixed(1)+'%（'+seg.side+'方向／'+seg.samples+'樣本）':'')
    +(thisRoad&&thisRoad.samples>=8?'｜預測這條路 '+thisRoad.label:'')
    +(nextRoad&&nextRoad.samples>=8?'｜預測下一條路 '+nextRoad.label:'')
-   +'｜每局獨立重新判斷：上一局輸贏不加減信心；只參考當下路型、下三路、歷史相似節點與長期實戰校準。60%以上必須歷史贏多於輸。';
+   +'｜模型信心僅代表訊號一致度，不等於下注勝率。預測下一條路只做後續路型預判，不是本局下注方向。';
  $('factorBox').innerHTML='';
  if(cx){
    var labels={big:'大路',eye:'大眼仔',small:'小路',cock:'曱甴路'};
@@ -1202,7 +1210,7 @@ async function updateDashboard(){
  var cleanShoes=cleanHistoricalShoes(shoes);
  var permanentHands=cleanShoes.reduce((s,x)=>s+(Array.isArray(x.sequence)?x.sequence.length:0),0); $('dbHands').textContent=permanentHands;
  $('dbShoes').textContent=cleanShoes.length;$('dbPred').textContent=hands.length;
- if($('modelVersion'))$('modelVersion').textContent='V29.1';
+ if($('modelVersion'))$('modelVersion').textContent='V29.2';
  var hits=hands.filter(x=>x.hit===true).length;
  // V27.1: Current-analysis historical support is rendered from fuzzy similar samples in refresh().
  // Do not overwrite #acc here with the much smaller live-settled-prediction history.
@@ -1215,8 +1223,8 @@ async function updateDashboard(){
  });
 }
 async function exportDB(){
- var payload={version:'29.1',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
- var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V29_1_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+ var payload={version:'29.2',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V29_2_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importDB(file){
  var data=JSON.parse(await file.text());
@@ -1237,6 +1245,12 @@ async function importDB(file){
  await loadFactorStats();await refresh();toast('備份已去重匯入');
 }
 
+function syncManualSequence(){
+ if(!$('manualSeq'))return;
+ $('manualSeq').value=state.current.join('');
+ $('manualSeqInfo').textContent='目前鞋已同步 '+state.current.length+' 局';
+}
+
 function parseManualSequence(raw){
  var s=(raw||'').toUpperCase().match(/[BPT]/g)||[];
  return s;
@@ -1244,22 +1258,23 @@ function parseManualSequence(raw){
 async function replaceWithManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- state.current=s.slice();
- state.pendingPrediction=null;
- await saveShoe();
- $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局';
- await refresh();
- toast('已取代目前鞋');
+ var old=state.current.slice();
+ state.current=s.slice(); state.pendingPrediction=null;
+ var ok=await saveShoe();
+ if(!ok){state.current=old;syncManualSequence();return toast('保存失敗，未取代');}
+ await refresh(); toast('已取代目前鞋：'+s.length+' 局');
 }
 async function appendManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- state.current=state.current.concat(s);
- state.pendingPrediction=null;
- await saveShoe();
- $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局';
- await refresh();
- toast('已接續目前鞋');
+ var old=state.current.slice(), delta=s;
+ var isPrefix=s.length>=old.length && old.every(function(x,i){return s[i]===x});
+ if(isPrefix)delta=s.slice(old.length);
+ if(!delta.length){syncManualSequence();return toast('沒有新增局數');}
+ state.current=state.current.concat(delta); state.pendingPrediction=null;
+ var ok=await saveShoe();
+ if(!ok){state.current=old;syncManualSequence();return toast('保存失敗，未接續');}
+ await refresh(); toast('已接續 '+delta.length+' 局，目前共 '+state.current.length+' 局');
 }
 
 
@@ -1411,7 +1426,7 @@ async function start(){
  $('manualSeq').oninput=function(){var s=parseManualSequence(this.value);$('manualSeqInfo').textContent=s.length?'已讀取 '+s.length+' 局':'尚未輸入序列。'};
  var bf=await backfillHistoricalLearning(false);await loadFactorStats();
  await refresh();
- toast((preloaded?'歷史路單已補齊｜':'')+'V29.1 已接續最後一鞋');
+ toast((preloaded?'歷史路單已補齊｜':'')+'V29.2 已接續最後一鞋');
 }
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
