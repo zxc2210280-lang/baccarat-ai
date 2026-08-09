@@ -40,7 +40,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <h1>AI PRO V27.3.1 TIE + CALIBRATION</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.3.1</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.4 ROAD FIX.1</div></div>
 </header>
 
 <section class="panel">
@@ -55,7 +55,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
   </div>
-  <p class="muted">V27.3：保留逐局存檔驗證，新增和局傾向、相似歷史和率與同級信心歷史命中校準。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
+  <p class="muted">V27.4：保留 V27.3 學習與逐局存檔；重寫標準大路與下三路引擎。手動 B/P/T 是唯一路單來源，T 附著前一個 B/P。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
 </section>
 
 <section class="panel">
@@ -103,7 +103,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
     <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b>V27.3</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V27.4</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -210,50 +210,121 @@ function openDB(){
  });
 }
 
-function bead(seq){return seq.map((x,i)=>({result:x,row:i%6,col:Math.floor(i/6),fill:true,ties:0}))}
+function cleanRoadSeq(seq){
+ return (Array.isArray(seq)?seq:[]).map(function(x){return String(x).toUpperCase()})
+  .filter(function(x){return x==='B'||x==='P'||x==='T'});
+}
+function bead(seq){
+ seq=cleanRoadSeq(seq);
+ return seq.map(function(x,i){return {result:x,row:i%6,col:Math.floor(i/6),fill:true,ties:0};});
+}
+
+/* Standard Big Road:
+   - T never opens a new B/P cell; it is attached to the latest B/P cell.
+   - Same side goes down while the next cell is free and row < 6.
+   - If blocked/bottomed, it turns right on the same row (dragon tail).
+   - A side change starts at row 1 of the next logical streak column.
+   logicalCol/logicalRow are preserved for the derived roads so dragon tails
+   do not corrupt Big-Eye/Small/Cockroach calculations. */
 function big(seq){
- var out=[],occ={},current=null,runStartCol=0,pendingTies=0;
+ seq=cleanRoadSeq(seq);
+ var cells=[], occ={}, last=null, streak=-1, streakRow=-1, leadingTies=0;
  seq.forEach(function(x){
-  if(x==='T'){if(current)current.ties=(current.ties||0)+1;else pendingTies++;return}
-  if(!current){current={result:x,row:0,col:0,ties:pendingTies};pendingTies=0;runStartCol=0;out.push(current);occ['0,0']=1;return}
-  var row,col;
-  if(x===current.result){
-   if(current.row<5&&!occ[(current.row+1)+','+current.col]){row=current.row+1;col=current.col}
-   else{row=current.row;col=current.col+1;while(occ[row+','+col])col++}
-  }else{
-   row=0;col=runStartCol+1;while(occ[row+','+col])col++;runStartCol=col
+  if(x==='T'){
+   if(last) last.ties=(last.ties||0)+1;
+   else leadingTies++;
+   return;
   }
-  current={result:x,row:row,col:col,ties:0};out.push(current);occ[row+','+col]=1
- });
- return out;
-}
-function heights(c){var h={};c.forEach(x=>h[x.col]=Math.max(h[x.col]||0,x.row+1));return h}
-function occMap(c){var o={};c.forEach(x=>o[x.row+','+x.col]=1);return o}
-function signals(c,off){
- var s=[],h=heights(c),o=occMap(c);
- c.forEach(function(x){
-  var enough=x.row===0?x.col>=off+1:x.col>=off;if(!enough)return;
-  var red;
-  if(x.row===0) red=(h[x.col-1]||0)===(h[x.col-1-off]||0);
-  else red=(!!o[x.row+','+(x.col-off)])===(!!o[(x.row-1)+','+(x.col-off)]);
-  s.push(red?'B':'P');
- });
- return s;
-}
-function marker(s){
- var cells=[],o={},cur=null,run=0;
- s.forEach(function(x){
-  if(!cur){cur={result:x,row:0,col:0,fill:true};cells.push(cur);o['0,0']=1;return}
-  var r,c;
-  if(x===cur.result){
-   if(cur.row<5&&!o[(cur.row+1)+','+cur.col]){r=cur.row+1;c=cur.col}
-   else{r=cur.row;c=cur.col+1;while(o[r+','+c])c++}
-  }else{r=0;c=run+1;while(o[r+','+c])c++;run=c}
-  cur={result:x,row:r,col:c,fill:true};cells.push(cur);o[r+','+c]=1;
+
+  var same = !!last && last.result===x;
+  if(!last || !same){
+   streak++;
+   streakRow=0;
+   var nc=streak; // logical streak starts across the top
+   while(occ['0,'+nc]) nc++;
+   last={result:x,row:0,col:nc,logicalCol:streak,logicalRow:0,
+         ties:(!cells.length?leadingTies:0)};
+   leadingTies=0;
+  }else{
+   streakRow++;
+   var nr=last.row, nc=last.col;
+   if(nr<5 && !occ[(nr+1)+','+nc]){
+    nr++;
+   }else{
+    nc++;
+    while(occ[nr+','+nc]) nc++;
+   }
+   last={result:x,row:nr,col:nc,logicalCol:streak,logicalRow:streakRow,ties:0};
+  }
+  cells.push(last);
+  occ[last.row+','+last.col]=1;
  });
  return cells;
 }
-function roadData(seq){var b=big(seq);return{bead:bead(seq),big:b,eye:marker(signals(b,1)),small:marker(signals(b,2)),cock:marker(signals(b,3))}}
+
+function logicalColumns(bigCells){
+ var cols=[];
+ bigCells.forEach(function(x){
+  var c=x.logicalCol;
+  if(c==null)return;
+  if(!cols[c]) cols[c]=[];
+  cols[c].push(x);
+ });
+ return cols;
+}
+
+/* Standard derived-road comparison.
+   offset 1 = Big Eye Boy, 2 = Small Road, 3 = Cockroach Road.
+   On the first row of a new Big-Road streak compare the lengths of the
+   two reference logical columns.  Inside a streak compare existence of
+   the same logical row versus the row immediately above in the reference
+   column. */
+function signals(bigCells,off){
+ var cols=logicalColumns(bigCells), out=[];
+ bigCells.forEach(function(x){
+  var c=x.logicalCol, r=x.logicalRow;
+  if(c==null||r==null)return;
+
+  if(r===0){
+   if(c<off+1)return;
+   var a=(cols[c-1]||[]).length;
+   var b=(cols[c-1-off]||[]).length;
+   out.push(a===b?'B':'P'); // red / blue marker
+  }else{
+   if(c<off)return;
+   var ref=cols[c-off]||[];
+   var sameRow=ref.length>r;
+   var above=ref.length>(r-1);
+   out.push(sameRow===above?'B':'P');
+  }
+ });
+ return out;
+}
+
+function marker(s){
+ var cells=[],occ={},last=null,streak=-1;
+ s.forEach(function(x){
+  if(!last || x!==last.result){
+   streak++;
+   var c=streak;
+   while(occ['0,'+c])c++;
+   last={result:x,row:0,col:c,fill:true};
+  }else{
+   var r=last.row,c=last.col;
+   if(r<5&&!occ[(r+1)+','+c])r++;
+   else{c++;while(occ[r+','+c])c++;}
+   last={result:x,row:r,col:c,fill:true};
+  }
+  cells.push(last);occ[last.row+','+last.col]=1;
+ });
+ return cells;
+}
+function roadData(seq){
+ seq=cleanRoadSeq(seq);
+ var b=big(seq);
+ return {bead:bead(seq),big:b,eye:marker(signals(b,1)),
+         small:marker(signals(b,2)),cock:marker(signals(b,3))};
+}
 function drawRoad(id,cells,fill){
  var el=$(id);el.innerHTML='';
  cells.forEach(function(c){
@@ -554,7 +625,7 @@ async function updateDashboard(){
  });
 }
 async function exportDB(){
- var payload={version:'27.3',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var payload={version:'27.4',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V27_3_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importDB(file){
