@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V27.1 BACKFILL LEARNING</title>
+<title>AI PRO V27.3 TIE + CALIBRATION</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V27.1 BACKFILL LEARNING</h1>
+    <h1>AI PRO V27.3 TIE + CALIBRATION</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.1 FIX</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.3</div></div>
 </header>
 
 <section class="panel">
@@ -55,7 +55,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
   </div>
-  <p class="muted">V27.1：逐局 B/P/T 與整串手動序列都可用；歷史回填資料會持續保留。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
+  <p class="muted">V27.3：保留逐局存檔驗證，新增和局傾向、相似歷史和率與同級信心歷史命中校準。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
 </section>
 
 <section class="panel">
@@ -83,6 +83,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">莊／閒／和</span><b id="bpt">0 / 0 / 0</b></div>
     <div class="card"><span class="muted">相似樣本</span><b id="similar">0</b></div>
     <div class="card"><span class="muted">相似局歷史支持</span><b id="acc">尚無資料</b></div>
+    <div class="card"><span class="muted">和局傾向</span><b id="tiePct">—</b></div>
+    <div class="card"><span class="muted">相似歷史和率</span><b id="tieHist">—</b></div>
+    <div class="card"><span class="muted">同級信心命中</span><b id="confHist">—</b></div>
+    <div class="card"><span class="muted">同級信心樣本</span><b id="confSamples">0</b></div>
   </div>
   <p id="reason" class="muted"></p>
 </section>
@@ -99,7 +103,8 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
     <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b>V26</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V27.3</b></div>
+    <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
 </section>
@@ -171,6 +176,20 @@ function newShoeId(){return 'S'+Date.now()}
 function tx(store,mode){return db.transaction(store,mode).objectStore(store)}
 function reqP(req){return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)})}
 function allP(store){return reqP(tx(store,'readonly').getAll())}
+
+async function verifiedSaveShoe(){
+  if(!state.shoeId)return false;
+  var payload={shoeId:state.shoeId,updatedAt:nowIso(),sequence:state.current.slice()};
+  await reqP(tx('shoes','readwrite').put(payload));
+  var check=await reqP(tx('shoes','readonly').get(state.shoeId));
+  var ok=!!(check&&Array.isArray(check.sequence)&&check.sequence.length===state.current.length);
+  if($('saveStatus')){
+    $('saveStatus').textContent=ok?'✓ 已保存':'⚠ 保存失敗';
+    $('saveStatus').className=ok?'ok':'warn';
+  }
+  return ok;
+}
+
 
 function openDB(){
  return new Promise((res,rej)=>{
@@ -295,6 +314,90 @@ function factorSignals(seq,sim){
   similar:sim.samples>=8?(sim.bRate-.5)*2:0
  };
 }
+
+function confidenceBand(c){
+  c=Math.max(0,Math.min(100,Number(c)||0));
+  if(c>=90)return [90,100,'90–100%'];
+  if(c>=80)return [80,89,'80–89%'];
+  if(c>=70)return [70,79,'70–79%'];
+  if(c>=60)return [60,69,'60–69%'];
+  if(c>=50)return [50,59,'50–59%'];
+  return [0,49,'0–49%'];
+}
+
+async function confidenceCalibration(c){
+  var band=confidenceBand(c), all=await allP('hands');
+  var rows=all.filter(function(x){
+    return (x.prediction==='B'||x.prediction==='P') &&
+           (x.actual==='B'||x.actual==='P') &&
+           Number.isFinite(Number(x.confidence)) &&
+           Number(x.confidence)>=band[0] && Number(x.confidence)<=band[1];
+  });
+  var wins=rows.filter(function(x){return x.hit===true || x.prediction===x.actual;}).length;
+  return {
+    band:band[2],
+    samples:rows.length,
+    rate:rows.length?wins/rows.length:null
+  };
+}
+
+function bpTailSimilarity(a,b,maxN){
+  a=a.filter(function(x){return x!=='T'});
+  b=b.filter(function(x){return x!=='T'});
+  var n=Math.min(maxN||8,a.length,b.length),same=0;
+  for(var i=1;i<=n;i++){
+    if(a[a.length-i]===b[b.length-i])same++;
+  }
+  return n?same/n:0;
+}
+
+async function tieHistoricalStats(seq){
+  var shoes=await allP('shoes');
+  var currentBP=seq.filter(function(x){return x!=='T'});
+  if(currentBP.length<4)return {samples:0,ties:0,rate:null,weightedRate:null};
+
+  var samples=0,ties=0,weightedTie=0,weightSum=0;
+
+  shoes.forEach(function(shoe){
+    var s=Array.isArray(shoe.sequence)?shoe.sequence:[];
+    // Every historical prefix can become a "current state", and the next real hand is the outcome.
+    for(var i=4;i<s.length;i++){
+      var prefix=s.slice(0,i);
+      var sim=bpTailSimilarity(seq,prefix,8);
+
+      // Also reward similar T density in the most recent 12 hands.
+      var a12=seq.slice(-12), b12=prefix.slice(-12);
+      var ta=a12.length?a12.filter(function(x){return x==='T'}).length/a12.length:0;
+      var tb=b12.length?b12.filter(function(x){return x==='T'}).length/b12.length:0;
+      var tieDensityScore=Math.max(0,1-Math.abs(ta-tb)*4);
+
+      var w=sim*.8+tieDensityScore*.2;
+      if(sim>=.625){ // at least 5/8 BP-tail agreement when enough data exists
+        samples++;
+        if(s[i]==='T')ties++;
+        weightedTie+=(s[i]==='T'?1:0)*w;
+        weightSum+=w;
+      }
+    }
+  });
+
+  return {
+    samples:samples,
+    ties:ties,
+    rate:samples?ties/samples:null,
+    weightedRate:weightSum?weightedTie/weightSum:null
+  };
+}
+
+function estimateTiePct(tieStats){
+  // Prior is deliberately conservative; history nudges it rather than replacing it.
+  var prior=.095;
+  if(!tieStats||!tieStats.samples)return prior;
+  var h=(tieStats.weightedRate!=null?tieStats.weightedRate:tieStats.rate);
+  var strength=Math.min(.65,tieStats.samples/250*.65);
+  return prior*(1-strength)+h*strength;
+}
+
 async function analyze(seq){
  if(seq.filter(x=>x!=='T').length<6)return{b:50,p:50,c:0,call:'PASS',sim:{samples:0},factors:{}};
  var sig=signature(seq),sim=await fuzzySimilarStats(seq),fs=factorSignals(seq,sim),score=0,details=[];
@@ -383,8 +486,18 @@ async function saveShoe(){
 async function addResult(r){
  await settlePending(r);
  state.current.push(r);
- await saveShoe();
- await refresh();
+ if($('saveStatus')){$('saveStatus').textContent='儲存中…';$('saveStatus').className='warn';}
+ try{
+   var ok=await saveShoe();
+   if(!ok)throw new Error('寫入驗證失敗');
+   await refresh();
+   if($('saveStatus')){$('saveStatus').textContent='✓ 已保存';$('saveStatus').className='ok';}
+ }catch(e){
+   state.current.pop();state.pendingPrediction=null;
+   if($('saveStatus')){$('saveStatus').textContent='⚠ 保存失敗';$('saveStatus').className='warn';}
+   await refresh();
+   toast('這一局沒有成功存入，請再按一次');
+ }
 }
 async function refresh(){
  var rd=roadData(state.current);
@@ -392,7 +505,14 @@ async function refresh(){
  var c={B:0,P:0,T:0};state.current.forEach(x=>c[x]++);
  $('hands').textContent=state.current.length;$('bpt').textContent=c.B+' / '+c.P+' / '+c.T;
  var a=await analyze(state.current);
+ var tieStats=await tieHistoricalStats(state.current);
+ var tiePct=estimateTiePct(tieStats);
+ var confCal=await confidenceCalibration(a.c);
  $('bPct').textContent=a.b.toFixed(1)+'%';$('pPct').textContent=a.p.toFixed(1)+'%';$('conf').textContent=a.c+'%';$('similar').textContent=a.sim.samples||0;
+ $('tiePct').textContent=(tiePct*100).toFixed(1)+'%';
+ $('tieHist').textContent=tieStats.samples?((tieStats.rate*100).toFixed(1)+'%（'+tieStats.samples+'）'):'—';
+ $('confHist').textContent=confCal.samples&&confCal.rate!=null?((confCal.rate*100).toFixed(1)+'%'):'—';
+ $('confSamples').textContent=confCal.samples||0;
  $('call').textContent=a.call==='B'?'B 莊':a.call==='P'?'P 閒':'PASS';$('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':'#53627a';
  var histText='尚無資料', histRate=null, histSide='';
  if(a.sim&&a.sim.samples){
@@ -405,7 +525,9 @@ async function refresh(){
  $('acc').textContent=histText;
  $('reason').textContent=(a.call==='PASS'?'訊號不足，建議 PASS。':'已綜合永久歷史、相似局面與自適應權重。')
    +(a.sim&&a.sim.samples?'｜相似局加權樣本 '+a.sim.samples+'｜歷史'+histSide+'支持 '+(histRate*100).toFixed(1)+'%':'')
-   +'｜模型信心代表訊號一致度，不等於實際勝率。';
+   ++'｜模型信心代表訊號一致度，不等於實際勝率。'
+   +'｜同級信心 '+confCal.band+'：'+(confCal.samples?(confCal.rate*100).toFixed(1)+'% / '+confCal.samples+'筆':'樣本不足')
+   +'｜和局模型 '+(tiePct*100).toFixed(1)+'%'+(tieStats.samples?'，相似歷史和率 '+(tieStats.rate*100).toFixed(1)+'% / '+tieStats.samples+'筆':'');
  $('factorBox').innerHTML='';
  FACTORS.forEach(function(f){
   var st=learned[f.id]||{samples:0,wins:0};var w=factorWeight(f.id),rate=st.samples?st.wins/st.samples:0;
@@ -418,7 +540,7 @@ async function refresh(){
 }
 async function updateDashboard(){
  var hands=await allP('hands'),shoes=await allP('shoes');
- $('dbHands').textContent=shoes.reduce((s,x)=>s+(x.sequence?x.sequence.length:0),0);
+ var permanentHands=shoes.reduce((s,x)=>s+(Array.isArray(x.sequence)?x.sequence.length:0),0); $('dbHands').textContent=permanentHands;
  $('dbShoes').textContent=shoes.length;$('dbPred').textContent=hands.length;
  var hits=hands.filter(x=>x.hit===true).length;
  // V27.1: Current-analysis historical support is rendered from fuzzy similar samples in refresh().
@@ -432,8 +554,8 @@ async function updateDashboard(){
  });
 }
 async function exportDB(){
- var payload={version:'27.1',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
- var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V27_1_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+ var payload={version:'27.3',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V27_3_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importDB(file){
  var data=JSON.parse(await file.text());
