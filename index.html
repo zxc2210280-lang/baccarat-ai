@@ -40,7 +40,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <h1>AI PRO V27.3.1 TIE + CALIBRATION</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.5 MICROGAMING.1</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.6 DRAFT PERSIST.1</div></div>
 </header>
 
 <section class="panel">
@@ -55,7 +55,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
   </div>
-  <p class="muted">V27.5：路單改依 Microgaming 公開手冊公式：珠盤按時間六列、大路按莊閒連續列、T 附著前一格；大眼仔 k=1、小路 k=2、曱甴路 k=3。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
+  <p class="muted">V27.6：保留 Microgaming 路單公式，新增手動輸入草稿永久保留。切去娛樂城、切換 App、回到 Safari 或重新整理，輸入框內容都會自動恢復。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
 </section>
 
 <section class="panel">
@@ -104,7 +104,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
     <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b>V27.5</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V27.6</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -654,7 +654,7 @@ async function updateDashboard(){
  });
 }
 async function exportDB(){
- var payload={version:'27.5',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var payload={version:'27.6',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V27_3_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importDB(file){
@@ -673,6 +673,58 @@ function updateSeqAudit(seq){
  }
 }
 
+
+var MANUAL_DRAFT_KEY='AI_PRO_V27_MANUAL_DRAFT';
+
+function saveManualDraft(){
+  if(!$('manualSeq'))return;
+  try{
+    localStorage.setItem(MANUAL_DRAFT_KEY,$('manualSeq').value||'');
+  }catch(e){}
+}
+
+function restoreManualDraft(){
+  if(!$('manualSeq'))return;
+  try{
+    var draft=localStorage.getItem(MANUAL_DRAFT_KEY);
+    if(draft!==null && draft!==''){
+      $('manualSeq').value=draft;
+      var s=parseManualSequence(draft),c={B:0,P:0,T:0};
+      s.forEach(function(x){c[x]++;});
+      if($('manualSeqInfo')){
+        $('manualSeqInfo').textContent=s.length
+          ?('草稿已恢復：'+s.length+' 局｜B '+c.B+'｜P '+c.P+'｜T '+c.T)
+          :'已恢復草稿';
+      }
+    }
+  }catch(e){}
+}
+
+function clearManualDraft(){
+  try{localStorage.removeItem(MANUAL_DRAFT_KEY);}catch(e){}
+}
+
+function bindDraftPersistence(){
+  if(!$('manualSeq'))return;
+
+  // Save immediately on every change.
+  $('manualSeq').addEventListener('input',saveManualDraft);
+
+  // Save before Safari/app goes to background.
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden)saveManualDraft();
+    else restoreManualDraft();
+  });
+
+  window.addEventListener('pagehide',saveManualDraft);
+  window.addEventListener('beforeunload',saveManualDraft);
+
+  // iOS Safari may restore a page from bfcache.
+  window.addEventListener('pageshow',function(){
+    restoreManualDraft();
+  });
+}
+
 function parseManualSequence(raw){
  var s=(raw||'').toUpperCase().match(/[BPT]/g)||[];
  return s;
@@ -683,7 +735,7 @@ async function replaceWithManualSequence(){
  state.current=s.slice();
  state.pendingPrediction=null;
  await saveShoe();
- $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局';
+ $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局'; saveManualDraft();
  await refresh();
  toast('已取代目前鞋');
 }
@@ -693,7 +745,7 @@ async function appendManualSequence(){
  state.current=state.current.concat(s);
  state.pendingPrediction=null;
  await saveShoe();
- $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局';
+ $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局'; saveManualDraft();
  await refresh();
  toast('已接續目前鞋');
 }
@@ -823,6 +875,8 @@ function bindCloudUI(){
 async function start(){
  await openDB();await loadFactorStats();
  bindCloudUI();
+ bindDraftPersistence();
+ restoreManualDraft();
  var shoes=await allP('shoes');
  if(shoes.length){shoes.sort((a,b)=>String(a.updatedAt).localeCompare(String(b.updatedAt)));var s=shoes[shoes.length-1];state.shoeId=s.shoeId;state.current=Array.isArray(s.sequence)?s.sequence:[]}
  else{state.shoeId=newShoeId();await saveShoe()}
@@ -834,8 +888,9 @@ async function start(){
  $('importInput').onchange=function(){if(this.files[0])importDB(this.files[0]);this.value=''};
  $('replaceSeq').onclick=replaceWithManualSequence;
  $('appendSeq').onclick=appendManualSequence;
- $('clearSeq').onclick=function(){$('manualSeq').value='';$('manualSeqInfo').textContent='尚未輸入序列。'};
+ $('clearSeq').onclick=function(){$('manualSeq').value='';clearManualDraft();$('manualSeqInfo').textContent='尚未輸入序列。';};
  $('manualSeq').oninput=function(){
+ saveManualDraft();
  var s=parseManualSequence(this.value),c={B:0,P:0,T:0};s.forEach(function(x){c[x]++;});
  $('manualSeqInfo').textContent=s.length?('已讀取 '+s.length+' 局｜B '+c.B+'｜P '+c.P+'｜T '+c.T):'尚未輸入序列。';
 };
