@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V27 BACKFILL LEARNING</title>
+<title>AI PRO V27.1 BACKFILL LEARNING</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V27 BACKFILL LEARNING</h1>
+    <h1>AI PRO V27.1 BACKFILL LEARNING</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27 BACKFILL</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.1 FIX</div></div>
 </header>
 
 <section class="panel">
@@ -55,7 +55,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
   </div>
-  <p class="muted">V25 FINAL：逐局 B/P/T 與整串手動序列都可用。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
+  <p class="muted">V27.1：逐局 B/P/T 與整串手動序列都可用；歷史回填資料會持續保留。每一鞋與每一局都寫入永久資料庫，供歷史交叉比對與自適應權重更新。</p>
 </section>
 
 <section class="panel">
@@ -74,7 +74,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
   <h2>目前分析</h2>
   <div class="stats">
     <div><b id="bPct">50.0%</b><span class="muted">莊傾向</span></div>
-    <div><b id="conf">0%</b><span class="muted">信心</span></div>
+    <div><b id="conf">0%</b><span class="muted">模型信心（訊號一致度）</span></div>
     <div><b id="pPct">50.0%</b><span class="muted">閒傾向</span></div>
   </div>
   <div id="call" class="call">PASS</div>
@@ -82,7 +82,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">目前局數</span><b id="hands">0</b></div>
     <div class="card"><span class="muted">莊／閒／和</span><b id="bpt">0 / 0 / 0</b></div>
     <div class="card"><span class="muted">相似樣本</span><b id="similar">0</b></div>
-    <div class="card"><span class="muted">歷史命中率</span><b id="acc">尚無資料</b></div>
+    <div class="card"><span class="muted">相似局歷史支持</span><b id="acc">尚無資料</b></div>
   </div>
   <p id="reason" class="muted"></p>
 </section>
@@ -394,7 +394,18 @@ async function refresh(){
  var a=await analyze(state.current);
  $('bPct').textContent=a.b.toFixed(1)+'%';$('pPct').textContent=a.p.toFixed(1)+'%';$('conf').textContent=a.c+'%';$('similar').textContent=a.sim.samples||0;
  $('call').textContent=a.call==='B'?'B 莊':a.call==='P'?'P 閒':'PASS';$('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':'#53627a';
- $('reason').textContent=a.call==='PASS'?'訊號不足，建議 PASS。':'已綜合永久歷史、相似局面與自適應權重。';
+ var histText='尚無資料', histRate=null, histSide='';
+ if(a.sim&&a.sim.samples){
+   if(a.call==='B'){histRate=a.sim.bRate;histSide='莊';}
+   else if(a.call==='P'){histRate=1-a.sim.bRate;histSide='閒';}
+   else if(a.sim.bRate>=.5){histRate=a.sim.bRate;histSide='莊';}
+   else{histRate=1-a.sim.bRate;histSide='閒';}
+   histText=histSide+' '+(histRate*100).toFixed(1)+'%';
+ }
+ $('acc').textContent=histText;
+ $('reason').textContent=(a.call==='PASS'?'訊號不足，建議 PASS。':'已綜合永久歷史、相似局面與自適應權重。')
+   +(a.sim&&a.sim.samples?'｜相似局加權樣本 '+a.sim.samples+'｜歷史'+histSide+'支持 '+(histRate*100).toFixed(1)+'%':'')
+   +'｜模型信心代表訊號一致度，不等於實際勝率。';
  $('factorBox').innerHTML='';
  FACTORS.forEach(function(f){
   var st=learned[f.id]||{samples:0,wins:0};var w=factorWeight(f.id),rate=st.samples?st.wins/st.samples:0;
@@ -410,7 +421,8 @@ async function updateDashboard(){
  $('dbHands').textContent=shoes.reduce((s,x)=>s+(x.sequence?x.sequence.length:0),0);
  $('dbShoes').textContent=shoes.length;$('dbPred').textContent=hands.length;
  var hits=hands.filter(x=>x.hit===true).length;
- $('acc').textContent=hands.length?(hits/hands.length*100).toFixed(1)+'%':'尚無資料';
+ // V27.1: Current-analysis historical support is rendered from fuzzy similar samples in refresh().
+ // Do not overwrite #acc here with the much smaller live-settled-prediction history.
  $('dbStatus').innerHTML='<span class="ok">IndexedDB 已啟用</span>｜資料會持續保存在這台裝置';
  var recent=hands.slice(-50).reverse();$('historyRows').innerHTML=recent.length?'':'<tr><td colspan="7">尚無紀錄</td></tr>';
  recent.forEach(function(x){
@@ -420,8 +432,8 @@ async function updateDashboard(){
  });
 }
 async function exportDB(){
- var payload={version:27,exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
- var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V27_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+ var payload={version:'27.1',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V27_1_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importDB(file){
  var data=JSON.parse(await file.text());
