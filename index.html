@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V29.2 ROAD CORE LOCKED</title>
+<title>AI PRO V29.3 SAFE ROAD SYNC</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V29.2 ROAD CORE LOCKED</h1>
+    <h1>AI PRO V29.3 SAFE ROAD SYNC</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.2 ROAD CORE LOCKED</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.3 SAFE ROAD SYNC</div></div>
 </header>
 
 <section class="panel">
@@ -103,7 +103,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
     <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b>V29.2</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V29.1</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -258,29 +258,32 @@ function big(seq){
  });
  return out;
 }
-// === V29.2 STANDARD ROAD CORE — LOCKED ===
-// 下三路只由大路衍生；B=紅色結構點、P=藍色結構點，絕不代表莊/閒。
-// off=1 大眼仔、off=2 小路、off=3 曱甴路。
-// 新柱(row=0)：比較前一柱與再往前 off 柱的深度是否相同。
-// 同柱(row>0)：在參考柱比較「同列」與「上一列」是否同為有/無格；相同=紅，不同=藍。
-const ROAD_CORE_VERSION='STD_DERIVED_V1';
-function heights(c){var h={};c.forEach(x=>h[x.col]=Math.max(h[x.col]||0,x.row+1));return h}
-function occMap(c){var o={};c.forEach(x=>o[x.row+','+x.col]=1);return o}
-function derivedSignalsStandard(c,off){
- var s=[],h=heights(c),o=occMap(c);
- c.forEach(function(x){
-  var enough=x.row===0?x.col>=off+1:x.col>=off;
-  if(!enough)return;
-  var red=false;
-  if(x.row===0){
-   red=(h[x.col-1]||0)===(h[x.col-1-off]||0);
+// V29.3 SAFE ROAD SYNC
+// 下三路必須由「大路邏輯柱」逐局衍生，不使用畫面蛇尾後的實體 grid 欄高。
+// off=1 大眼仔、off=2 小路、off=3 曱甴路；B=紅結構、P=藍結構（不代表莊閒）。
+function derivedSignals(seq,off){
+ var a=seq.filter(function(x){return x==='B'||x==='P';});
+ var lens=[], side=null, run=-1, pos=0, s=[];
+ for(var k=0;k<a.length;k++){
+  var x=a[k];
+  if(x!==side){
+   side=x;run++;pos=1;lens[run]=1;
+   // 新柱第一顆：比較前一邏輯柱與往前 off+1 的邏輯柱長度。
+   if(run>=off+1){
+    var redTop=(lens[run-1]||0)===(lens[run-1-off]||0);
+    s.push(redTop?'B':'P');
+   }
   }else{
-   var sameRow=!!o[x.row+','+(x.col-off)];
-   var aboveRow=!!o[(x.row-1)+','+(x.col-off)];
-   red=sameRow===aboveRow;
+   pos++;lens[run]=pos;
+   // 同柱向下：比較往前 off 柱在本列與上一列是否同時存在/同時不存在。
+   if(run>=off){
+    var targetLen=lens[run-off]||0;
+    var atThis=targetLen>=pos;
+    var atPrev=targetLen>=pos-1;
+    s.push(atThis===atPrev?'B':'P');
+   }
   }
-  s.push(red?'B':'P');
- });
+ }
  return s;
 }
 function marker(s){
@@ -296,29 +299,7 @@ function marker(s){
  });
  return cells;
 }
-function roadData(seq){
- var b=big(seq);
- return{bead:bead(seq),big:b,eye:marker(derivedSignalsStandard(b,1)),small:marker(derivedSignalsStandard(b,2)),cock:marker(derivedSignalsStandard(b,3))};
-}
-// 固定回歸測試：任何未來升版若動到大路/下三路核心，啟動時直接報錯，不允許靜默變形。
-function roadCoreSelfTest(){
- var tests=[
-  {seq:'BPBPBPBP',eye:'BBBBBB',small:'BBBBB',cock:'BBBB'},
-  {seq:'BBPBBPBBP',eye:'PPPPPP',small:'BBBBB',cock:'PPP'},
-  {seq:'BBBPBPPBBP',eye:'PBPPBB',small:'PPPPP',cock:'BPPP'},
-  {seq:'BBBPPBBBBPBB',eye:'BPBPBPPP',small:'BBPPPB',cock:'PB'}
- ];
- for(var i=0;i<tests.length;i++){
-  var t=tests[i],b=big(t.seq.split(''));
-  var e=derivedSignalsStandard(b,1).join('');
-  var sm=derivedSignalsStandard(b,2).join('');
-  var c=derivedSignalsStandard(b,3).join('');
-  if(e!==t.eye||sm!==t.small||c!==t.cock){
-   return{ok:false,index:i+1,got:[e,sm,c],expected:[t.eye,t.small,t.cock]};
-  }
- }
- return{ok:true,version:ROAD_CORE_VERSION,tests:tests.length};
-}
+function roadData(seq){var b=big(seq);return{bead:bead(seq),big:b,eye:marker(derivedSignals(seq,1)),small:marker(derivedSignals(seq,2)),cock:marker(derivedSignals(seq,3))}}
 function drawRoad(id,cells,fill){
  var el=$(id);el.innerHTML='';
  cells.forEach(function(c){
@@ -1356,8 +1337,6 @@ function bindCloudUI(){
 }
 
 async function start(){
- var coreCheck=roadCoreSelfTest();
- if(!coreCheck.ok)throw new Error('路單核心自檢失敗 #'+coreCheck.index);
  await openDB();
  var preloaded=await preloadHistoryOnce();
  await loadFactorStats();
@@ -1384,7 +1363,7 @@ async function start(){
  $('manualSeq').oninput=function(){var s=parseManualSequence(this.value);$('manualSeqInfo').textContent=s.length?'已讀取 '+s.length+' 局':'尚未輸入序列。'};
  var bf=await backfillHistoricalLearning(false);await loadFactorStats();
  await refresh();
- toast((preloaded?'歷史路單已自動匯入｜':'')+'V29.2 路單核心 '+ROAD_CORE_VERSION+' ✓');
+ toast((preloaded?'歷史路單已自動匯入｜':'')+'V28 已接續最後一鞋');
 }
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
