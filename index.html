@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V26 CLOUD LEARNING</title>
+<title>AI PRO V27 BACKFILL LEARNING</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V26 CLOUD LEARNING</h1>
+    <h1>AI PRO V27 BACKFILL LEARNING</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V26 CLOUD</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27 BACKFILL</div></div>
 </header>
 
 <section class="panel">
@@ -297,7 +297,7 @@ function factorSignals(seq,sim){
 }
 async function analyze(seq){
  if(seq.filter(x=>x!=='T').length<6)return{b:50,p:50,c:0,call:'PASS',sim:{samples:0},factors:{}};
- var sig=signature(seq),sim=await similarStats(sig),fs=factorSignals(seq,sim),score=0,details=[];
+ var sig=signature(seq),sim=await fuzzySimilarStats(seq),fs=factorSignals(seq,sim),score=0,details=[];
  FACTORS.forEach(function(f){
   var w=factorWeight(f.id),v=fs[f.id]||0;score+=w*v;details.push({id:f.id,name:f.name,w:w,v:v,impact:w*v});
  });
@@ -306,7 +306,7 @@ async function analyze(seq){
  return{b:b,p:100-b,c:c,call:call,sim:sim,factors:details,signature:sig};
 }
 async function updateLearning(record,actual){
- if(!record||record.call==='PASS'||!(actual==='B'||actual==='P'))return;
+ if(!record||!(actual==='B'||actual==='P'))return;
  var hit=record.call===actual;
  for(var i=0;i<record.factors.length;i++){
   var f=record.factors[i]; if(Math.abs(f.v)<.05)continue;
@@ -320,8 +320,8 @@ async function updateLearning(record,actual){
 async function settlePending(actual){
  if(!state.pendingPrediction)return;
  var p=state.pendingPrediction;
+ await updateLearning(p,actual);
  if(p.call==='B'||p.call==='P'){
-  await updateLearning(p,actual);
   var rec={
    time:nowIso(),shoeId:state.shoeId,handNo:state.current.length,
    prediction:p.call,confidence:p.c,actual:actual,hit:p.call===actual,
@@ -330,6 +330,50 @@ async function settlePending(actual){
   await reqP(tx('hands','readwrite').add(rec));
  }
  state.pendingPrediction=null;
+}
+async function backfillHistoricalLearning(force){
+ var meta=await reqP(tx('meta','readonly').get('v27Backfill'));
+ if(meta && meta.value==='done' && !force)return meta;
+ var shoes=await allP('shoes');
+ // Rebuild factor statistics from historical states. Existing shoe/history data are never deleted.
+ learned={}; FACTORS.forEach(f=>learned[f.id]={factorId:f.id,wins:0,losses:0,samples:0,weight:f.base});
+ var training=0;
+ for(const sh of shoes){
+  var seq=Array.isArray(sh.sequence)?sh.sequence:[];
+  for(var i=6;i<seq.length;i++){
+   var actual=seq[i]; if(actual!=='B'&&actual!=='P')continue;
+   var prior=seq.slice(0,i), sim={samples:0,bRate:.5};
+   var fs=factorSignals(prior,sim);
+   for(const f of FACTORS){
+    var v=fs[f.id]||0; if(Math.abs(v)<.05 || f.id==='similar')continue;
+    var expected=v>0?'B':'P', row=learned[f.id];
+    row.samples++; if(expected===actual)row.wins++; else row.losses++;
+   }
+   training++;
+  }
+ }
+ // Second pass: fuzzy historical-pattern learning using prior outcomes only (no look-ahead).
+ var patternMap={};
+ for(const sh of shoes){
+  var seq=Array.isArray(sh.sequence)?sh.sequence:[];
+  for(var i=6;i<seq.length;i++){
+   var actual=seq[i]; if(actual!=='B'&&actual!=='P')continue;
+   var prior=seq.slice(0,i), keys=[tailPattern(prior,6),tailPattern(prior,5),tailPattern(prior,4)];
+   var votes=[];
+   keys.forEach((k,level)=>{var r=patternMap[level+'|'+k];if(r&&r.n>=2)votes.push(r.b/r.n)});
+   if(votes.length){var rate=votes.reduce((a,b)=>a+b,0)/votes.length, row=learned.similar;row.samples++;var expected=rate>=.5?'B':'P';if(expected===actual)row.wins++;else row.losses++;}
+   keys.forEach((k,level)=>{var id=level+'|'+k,r=patternMap[id]||(patternMap[id]={n:0,b:0});r.n++;if(actual==='B')r.b++;});
+  }
+ }
+ for(const f of FACTORS){var row=learned[f.id];row.weight=factorWeight(f.id);await reqP(tx('factorStats','readwrite').put(row));}
+ var result={key:'v27Backfill',value:'done',trainingSamples:training,updatedAt:nowIso()};
+ await reqP(tx('meta','readwrite').put(result)); return result;
+}
+
+async function fuzzySimilarStats(seq){
+ var shoes=await allP('shoes'), keys=[tailPattern(seq,6),tailPattern(seq,5),tailPattern(seq,4)], b=0,p=0,weighted=0;
+ for(const sh of shoes){var a=Array.isArray(sh.sequence)?sh.sequence:[];for(var i=6;i<a.length;i++){var actual=a[i];if(actual!=='B'&&actual!=='P')continue;var prior=a.slice(0,i),w=0;if(tailPattern(prior,6)===keys[0])w=3;else if(tailPattern(prior,5)===keys[1])w=2;else if(tailPattern(prior,4)===keys[2])w=1;if(w){weighted+=w;if(actual==='B')b+=w;else p+=w;}}}
+ return{samples:Math.round(weighted),b:b,p:p,bRate:weighted?b/weighted:.5};
 }
 async function saveShoe(){
  if(!state.shoeId)return;
@@ -376,8 +420,8 @@ async function updateDashboard(){
  });
 }
 async function exportDB(){
- var payload={version:26,exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
- var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V26_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+ var payload={version:27,exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V27_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importDB(file){
  var data=JSON.parse(await file.text());
@@ -550,7 +594,9 @@ async function start(){
  $('appendSeq').onclick=appendManualSequence;
  $('clearSeq').onclick=function(){$('manualSeq').value='';$('manualSeqInfo').textContent='尚未輸入序列。'};
  $('manualSeq').oninput=function(){var s=parseManualSequence(this.value);$('manualSeqInfo').textContent=s.length?'已讀取 '+s.length+' 局':'尚未輸入序列。'};
+ var bf=await backfillHistoricalLearning(false);await loadFactorStats();
  await refresh();
+ toast('V27 歷史回填完成：'+(bf.trainingSamples||0)+' 筆');
 }
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
