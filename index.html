@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V29.0 CLEAR 60 BET</title>
+<title>AI PRO V29.1 RUNS FIXED</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V29.0 CLEAR 60 BET</h1>
+    <h1>AI PRO V29.1 RUNS FIXED</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.0 CLEAR 60 BET</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.1 RUNS FIXED</div></div>
 </header>
 
 <section class="panel">
@@ -103,7 +103,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
     <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b>V29.0</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V29.1</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -483,7 +483,7 @@ async function breakpointCross(seq){
      if(sim<.60)continue;
 
      // 當前龍長只作「局面特徵」，不是信心累積來源
-     var pr=runs(prior), pc=pr.length?pr[pr.length-1]:null;
+     var pr=runsOf(prior), pc=pr.length?pr[pr.length-1]:null;
      var lenSim=pc ? (1-Math.min(4,Math.abs(pc.len-currentLen))/4) : .5;
      var w=Math.pow((sim-.50)/.50,2.35) * (.82 + .18*lenSim);
      if(w<=0)continue;
