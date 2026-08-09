@@ -1278,24 +1278,32 @@ function parseManualSequence(raw){
  var s=(raw||'').toUpperCase().match(/[BPT]/g)||[];
  return s;
 }
+async function applySequenceThroughSettlement(seq,mode){
+ // V29.2 SETTLEMENT INPUT FIX：任何「新增實際結果」都逐局走同一條結算鏈。
+ // 這裡刻意重用 addResultCore，不改分析、勝率、路單、權重或門檻。
+ var s=Array.isArray(seq)?seq:[];
+ if(mode==='replace'){
+   state.current=[];
+   state.pendingPrediction=null;
+   await saveShoe();
+   await refresh(); // 先建立第 1 局開獎前的預測快照（即使是 PASS/資料不足也保留）
+ }
+ for(var i=0;i<s.length;i++) await addResultCore(s[i]);
+}
 async function replaceWithManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- state.current=s.slice();
- state.pendingPrediction=null;
- await saveShoe();
+ await resultInputQueue;
+ await applySequenceThroughSettlement(s,'replace');
  $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局';
- await refresh();
  toast('已取代目前鞋');
 }
 async function appendManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- state.current=state.current.concat(s);
- state.pendingPrediction=null;
- await saveShoe();
+ await resultInputQueue;
+ await applySequenceThroughSettlement(s,'append');
  $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局';
- await refresh();
  toast('已接續目前鞋');
 }
 
