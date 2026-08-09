@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V27.3 TIE + CALIBRATION</title>
+<title>AI PRO V27.3.1 TIE + CALIBRATION</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V27.3 TIE + CALIBRATION</h1>
+    <h1>AI PRO V27.3.1 TIE + CALIBRATION</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.3</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V27.3.1</div></div>
 </header>
 
 <section class="panel">
@@ -525,7 +525,7 @@ async function refresh(){
  $('acc').textContent=histText;
  $('reason').textContent=(a.call==='PASS'?'訊號不足，建議 PASS。':'已綜合永久歷史、相似局面與自適應權重。')
    +(a.sim&&a.sim.samples?'｜相似局加權樣本 '+a.sim.samples+'｜歷史'+histSide+'支持 '+(histRate*100).toFixed(1)+'%':'')
-   ++'｜模型信心代表訊號一致度，不等於實際勝率。'
+   +'｜模型信心代表訊號一致度，不等於實際勝率。'
    +'｜同級信心 '+confCal.band+'：'+(confCal.samples?(confCal.rate*100).toFixed(1)+'% / '+confCal.samples+'筆':'樣本不足')
    +'｜和局模型 '+(tiePct*100).toFixed(1)+'%'+(tieStats.samples?'，相似歷史和率 '+(tieStats.rate*100).toFixed(1)+'% / '+tieStats.samples+'筆':'');
  $('factorBox').innerHTML='';
