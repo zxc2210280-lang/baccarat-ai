@@ -1114,33 +1114,33 @@ async function updateLearning(record,actual){
  }
 }
 async function settlePending(actual){
- if(!state.pendingPrediction)return;
+ // V29.2 SETTLEMENT FIX：只要上一局已產生預測快照，就一定結算。
+ // PASS、資料不足、0 信心也保留，避免永久局數增加但「已結算預測」不累積。
+ if(!state.pendingPrediction)return false;
  var p=state.pendingPrediction;
  await updateLearning(p,actual);
  var shadow=(p.call==='B'||p.call==='P')?p.call:
             (p.directionSide==='B'||p.directionSide==='P'?p.directionSide:null);
- var meaningful=(p.call==='B'||p.call==='P'||p.call==='T'||shadow!==null||Number(p.c)>0);
- if(meaningful){
-  var rec={
-   time:nowIso(),shoeId:state.shoeId,handNo:state.current.length,
-   prediction:p.call||'PASS',confidence:Number(p.c)||0,actual:actual,
-   hit:(p.call==='B'||p.call==='P'||p.call==='T')?p.call===actual:null,
-   isPass:p.call==='PASS',shadowPrediction:shadow,
-   shadowHit:shadow?shadow===actual:null,
-   directionalRate:p.directionalRate||null,decisionScore:p.decisionScore||null,
-   betTier:p.betTier||null,
-   signature:p.signature,factors:p.factors,
-   correction:p.cross?p.cross.correction:null,
-   routeClass:p.cross?p.cross.routeClass:null,
-   historicalSamples:p.cross?p.cross.samples:0,
-   routeMemorySamples:p.cross&&p.cross.routeMemory?p.cross.routeMemory.samples:0,
-   routeMemoryHitRate:p.cross&&p.cross.routeMemory?p.cross.routeMemory.hitRate:null,
-   breakpointCross:p.cross&&p.cross.breakpointCross?p.cross.breakpointCross:null,
-   reflection:p.cross&&p.cross.reflection?p.cross.reflection:null
-  };
-  await reqP(tx('hands','readwrite').add(rec));
- }
+ var rec={
+  time:nowIso(),shoeId:state.shoeId,handNo:state.current.length,
+  prediction:p.call||'PASS',confidence:Number(p.c)||0,actual:actual,
+  hit:(p.call==='B'||p.call==='P'||p.call==='T')?p.call===actual:null,
+  isPass:(p.call||'PASS')==='PASS',shadowPrediction:shadow,
+  shadowHit:shadow?shadow===actual:null,
+  directionalRate:p.directionalRate||null,decisionScore:p.decisionScore||null,
+  betTier:p.betTier||null,
+  signature:p.signature||null,factors:p.factors||{},
+  correction:p.cross?p.cross.correction:null,
+  routeClass:p.cross?p.cross.routeClass:null,
+  historicalSamples:p.cross?p.cross.samples:0,
+  routeMemorySamples:p.cross&&p.cross.routeMemory?p.cross.routeMemory.samples:0,
+  routeMemoryHitRate:p.cross&&p.cross.routeMemory?p.cross.routeMemory.hitRate:null,
+  breakpointCross:p.cross&&p.cross.breakpointCross?p.cross.breakpointCross:null,
+  reflection:p.cross&&p.cross.reflection?p.cross.reflection:null
+ };
+ await reqP(tx('hands','readwrite').add(rec));
  state.pendingPrediction=null;
+ return true;
 }
 async function backfillHistoricalLearning(force){
  // V28 不再用舊式勝敗回填來驅動預測；保留既有資料庫但標記新引擎已啟用。
@@ -1154,7 +1154,16 @@ async function saveShoe(){
  if(ok)setTimeout(function(){autoCloudSync();},0);
  return ok;
 }
-async function addResult(r){
+var resultInputQueue=Promise.resolve();
+function addResult(r){
+ // V29.2 SETTLEMENT FIX：手機快速連按時依序處理，避免下一次輸入早於上一局 refresh，造成 pendingPrediction 被跳過。
+ resultInputQueue=resultInputQueue.then(function(){return addResultCore(r);}).catch(function(e){
+   console.error('settlement input error',e);
+   toast('結算／保存失敗，請再按一次');
+ });
+ return resultInputQueue;
+}
+async function addResultCore(r){
  await settlePending(r);
  state.current.push(r);
  if($('saveStatus')){$('saveStatus').textContent='儲存中…';$('saveStatus').className='warn';}
