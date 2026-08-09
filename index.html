@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V29.3 SAFE ROAD SYNC</title>
+<title>AI PRO V29.4 SIMILARITY TIERS</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V29.3 SAFE ROAD SYNC</h1>
+    <h1>AI PRO V29.4 SIMILARITY TIERS</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.3 SAFE ROAD SYNC</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.4 SIMILARITY TIERS</div></div>
 </header>
 
 <section class="panel">
@@ -495,12 +495,14 @@ async function breakpointCross(seq){
 
      // 主相似度：路型、柱高、下三路尾端都要一起比
      var sim=featureSimilarity(f,pf);
-     if(sim<.60)continue;
+     if(sim<.68)continue;
 
      // 當前龍長只作「局面特徵」，不是信心累積來源
      var pr=runsOf(prior), pc=pr.length?pr[pr.length-1]:null;
      var lenSim=pc ? (1-Math.min(4,Math.abs(pc.len-currentLen))/4) : .5;
-     var w=Math.pow((sim-.50)/.50,2.35) * (.82 + .18*lenSim);
+     var tierMul=sim>=.86 ? 1 : (sim>=.77 ? .36 : .10);
+     var base=Math.max(0,(sim-.68)/.32);
+     var w=Math.pow(base,3.25)*tierMul*(.82 + .18*lenSim);
      if(w<=0)continue;
 
      totalW+=w; matchCount++;
@@ -641,7 +643,7 @@ async function routeCorrectionMemory(routeClass){
 async function historicalCross(seq){
  var shoes=cleanHistoricalShoes(await allP('shoes')), f=feature(seq), last=runsOf(seq).slice(-1)[0];
  var currentLast=last?last.side:null;
- if(!currentLast)return{samples:0,bRate:.5,tieRate:0,route:{},correction:'NONE',routeClass:f.cls,matches:[]};
+ if(!currentLast)return{samples:0,bRate:.5,tieRate:0,route:{},correction:'NONE',routeClass:f.cls,matches:[],tiers:{high:0,mid:0,low:0}};
 
  var uniq=shoes;
 
@@ -649,16 +651,24 @@ async function historicalCross(seq){
  var sumB=0,sumP=0,sumT=0,total=0,eff=0,tieNear=0,tieNearW=0;
  var route={big:{B:0,P:0},eye:{B:0,P:0},small:{B:0,P:0},cock:{B:0,P:0}};
  var matches=[];
+ var tiers={high:0,mid:0,low:0};
 
  for(const sh of uniq){
   var a=Array.isArray(sh.sequence)?sh.sequence:[];
   for(var i=6;i<a.length;i++){
    var actual=a[i],prior=a.slice(0,i);
    var pf=feature(prior),sim=featureSimilarity(f,pf);
-   if(sim<.58)continue;
 
-   // 越相似權重越高；不固定抓 1~20 局
-   var w=Math.pow((sim-.50)/.50,2.2);
+   // V29.4：相似度分層。低於 0.68 不再進主投票，避免大量普通案例把結果洗回 50/50。
+   if(sim<.68)continue;
+   var tier, tierMul;
+   if(sim>=.86){tier='high';tierMul=1.00;tiers.high++;}
+   else if(sim>=.77){tier='mid';tierMul=.36;tiers.mid++;}
+   else{tier='low';tierMul=.10;tiers.low++;}
+
+   // 高相似案例主導；越靠近門檻的案例只保留少量參考權重。
+   var base=Math.max(0,(sim-.68)/.32);
+   var w=Math.pow(base,3.25)*tierMul;
    if(w<=0)continue;
    total+=w; eff+=1;
 
@@ -669,7 +679,7 @@ async function historicalCross(seq){
     sumT+=w*gapBoost;
     tieNear+=w*gapBoost;
     tieNearW+=w;
-    if(matches.length<60)matches.push({sim:sim,shoe:sh.shoeId,hand:i+1,actual:'T',cls:pf.cls,tieGap:pf.gap});
+    if(matches.length<60)matches.push({sim:sim,tier:tier,shoe:sh.shoeId,hand:i+1,actual:'T',cls:pf.cls,tieGap:pf.gap});
     continue;
    }
    if(actual!=='B'&&actual!=='P')continue;
@@ -685,7 +695,7 @@ async function historicalCross(seq){
     var mb=trMatch(htr,hypB,k),mp=trMatch(htr,hypP,k);
     route[k].B+=w*mb; route[k].P+=w*mp;
    });
-   if(matches.length<60)matches.push({sim:sim,shoe:sh.shoeId,hand:i+1,actual:actual,structural:structural,cls:pf.cls});
+   if(matches.length<60)matches.push({sim:sim,tier:tier,shoe:sh.shoeId,hand:i+1,actual:actual,structural:structural,cls:pf.cls});
   }
  }
  var bp=sumB+sumP, bRate=bp?sumB/bp:.5;
@@ -718,7 +728,7 @@ async function historicalCross(seq){
 
  matches.sort((x,y)=>y.sim-x.sim);
  return{samples:eff,weighted:total,bRate:bRate,tieRate:tieRate,route:routeOut,
-  correction:correction,raw:raw,histStructural:histStructural,routeClass:f.cls,matches:matches.slice(0,20)};
+  correction:correction,raw:raw,histStructural:histStructural,routeClass:f.cls,matches:matches.slice(0,20),tiers:tiers};
 }
 
 async function loadFactorStats(){
@@ -741,7 +751,8 @@ function currentSegmentStats(cross,routeMem){
  var wins=raw*n, priorEach=8;
  var rate=(wins+priorEach)/(n+priorEach*2);
  var side=cross.bRate>=.5?'莊':'閒';
- var label=n<8?'樣本不足 ('+n+')':side+' '+(rate*100).toFixed(1)+'%｜'+n+'樣本';
+ var tierText=(cross.tiers&&cross.tiers.high!=null)?('｜高'+cross.tiers.high+' 中'+cross.tiers.mid+' 低'+cross.tiers.low):'';
+ var label=n<8?'樣本不足 ('+n+')':side+' '+(rate*100).toFixed(1)+'%｜'+n+'樣本'+tierText;
  var liveLabel='尚無資料';
  if(routeMem&&routeMem.samples){
    liveLabel=(routeMem.hitRate*100).toFixed(1)+'%｜'+routeMem.samples+'局';
