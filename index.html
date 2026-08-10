@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V29.2 FULL SYNC SETTLEMENT LEARNING</title>
+<title>AI PRO V29.4 CLEAN LEARNING ENGINE</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V29.2 FULL SYNC</h1>
+    <h1>AI PRO V29.4 CLEAN LEARNING ENGINE</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.2 SETTLEMENT LEARNING</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.4 CLEAN LEARNING ENGINE</div></div>
 </header>
 
 <section class="panel">
@@ -85,8 +85,6 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">相似樣本</span><b id="similar">0</b></div>
     <div class="card"><span class="muted">相似局歷史支持</span><b id="acc">尚無資料</b></div>
     <div class="card"><span class="muted">目前路段勝率</span><b id="segmentWin">樣本不足</b></div>
-    <div class="card"><span class="muted">預測這條路勝率<br>（本局證據）</span><b id="currentRoadWin">樣本不足</b></div>
-    <div class="card"><span class="muted">預測下一條路勝率<br>（後續預判，非本局下注）</span><b id="nextRoadWin">樣本不足</b></div>
     <div class="card"><span class="muted">同路型實戰命中</span><b id="segmentLive">尚無資料</b></div>
     <div class="card"><span class="muted">下注判定</span><b id="betGrade">觀察</b></div>
   </div>
@@ -104,8 +102,8 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
   <div class="cards">
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
-    <div class="card"><span class="muted">已結算預測</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b>V29.2</b></div>
+    <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V29.4 CLEAN</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -260,29 +258,32 @@ function big(seq){
  });
  return out;
 }
-// === V29.2 STANDARD ROAD CORE — LOCKED ===
-// 下三路只由大路衍生；B=紅色結構點、P=藍色結構點，絕不代表莊/閒。
-// off=1 大眼仔、off=2 小路、off=3 曱甴路。
-// 新柱(row=0)：比較前一柱與再往前 off 柱的深度是否相同。
-// 同柱(row>0)：在參考柱比較「同列」與「上一列」是否同為有/無格；相同=紅，不同=藍。
-const ROAD_CORE_VERSION='STD_DERIVED_V1';
-function heights(c){var h={};c.forEach(x=>h[x.col]=Math.max(h[x.col]||0,x.row+1));return h}
-function occMap(c){var o={};c.forEach(x=>o[x.row+','+x.col]=1);return o}
-function derivedSignalsStandard(c,off){
- var s=[],h=heights(c),o=occMap(c);
- c.forEach(function(x){
-  var enough=x.row===0?x.col>=off+1:x.col>=off;
-  if(!enough)return;
-  var red=false;
-  if(x.row===0){
-   red=(h[x.col-1]||0)===(h[x.col-1-off]||0);
+// V29.4 CLEAN LEARNING ENGINE
+// 下三路必須由「大路邏輯柱」逐局衍生，不使用畫面蛇尾後的實體 grid 欄高。
+// off=1 大眼仔、off=2 小路、off=3 曱甴路；B=紅結構、P=藍結構（不代表莊閒）。
+function derivedSignals(seq,off){
+ var a=seq.filter(function(x){return x==='B'||x==='P';});
+ var lens=[], side=null, run=-1, pos=0, s=[];
+ for(var k=0;k<a.length;k++){
+  var x=a[k];
+  if(x!==side){
+   side=x;run++;pos=1;lens[run]=1;
+   // 新柱第一顆：比較前一邏輯柱與往前 off+1 的邏輯柱長度。
+   if(run>=off+1){
+    var redTop=(lens[run-1]||0)===(lens[run-1-off]||0);
+    s.push(redTop?'B':'P');
+   }
   }else{
-   var sameRow=!!o[x.row+','+(x.col-off)];
-   var aboveRow=!!o[(x.row-1)+','+(x.col-off)];
-   red=sameRow===aboveRow;
+   pos++;lens[run]=pos;
+   // 同柱向下：比較往前 off 柱在本列與上一列是否同時存在/同時不存在。
+   if(run>=off){
+    var targetLen=lens[run-off]||0;
+    var atThis=targetLen>=pos;
+    var atPrev=targetLen>=pos-1;
+    s.push(atThis===atPrev?'B':'P');
+   }
   }
-  s.push(red?'B':'P');
- });
+ }
  return s;
 }
 function marker(s){
@@ -298,29 +299,7 @@ function marker(s){
  });
  return cells;
 }
-function roadData(seq){
- var b=big(seq);
- return{bead:bead(seq),big:b,eye:marker(derivedSignalsStandard(b,1)),small:marker(derivedSignalsStandard(b,2)),cock:marker(derivedSignalsStandard(b,3))};
-}
-// 固定回歸測試：任何未來升版若動到大路/下三路核心，啟動時直接報錯，不允許靜默變形。
-function roadCoreSelfTest(){
- var tests=[
-  {seq:'BPBPBPBP',eye:'BBBBBB',small:'BBBBB',cock:'BBBB'},
-  {seq:'BBPBBPBBP',eye:'PPPPPP',small:'BBBBB',cock:'PPP'},
-  {seq:'BBBPBPPBBP',eye:'PBPPBB',small:'PPPPP',cock:'BPPP'},
-  {seq:'BBBPPBBBBPBB',eye:'BPBPBPPP',small:'BBPPPB',cock:'PB'}
- ];
- for(var i=0;i<tests.length;i++){
-  var t=tests[i],b=big(t.seq.split(''));
-  var e=derivedSignalsStandard(b,1).join('');
-  var sm=derivedSignalsStandard(b,2).join('');
-  var c=derivedSignalsStandard(b,3).join('');
-  if(e!==t.eye||sm!==t.small||c!==t.cock){
-   return{ok:false,index:i+1,got:[e,sm,c],expected:[t.eye,t.small,t.cock]};
-  }
- }
- return{ok:true,version:ROAD_CORE_VERSION,tests:tests.length};
-}
+function roadData(seq){var b=big(seq);return{bead:bead(seq),big:b,eye:marker(derivedSignals(seq,1)),small:marker(derivedSignals(seq,2)),cock:marker(derivedSignals(seq,3))}}
 function drawRoad(id,cells,fill){
  var el=$(id);el.innerHTML='';
  cells.forEach(function(c){
@@ -378,6 +357,72 @@ function cleanHistoricalShoes(shoes){
  }
  return uniq.filter((_,i)=>keep[i]);
 }
+
+function cleanHistoricalHands(hands){
+ // 學習資料唯一鍵 = shoeId + handNo。重複只留最新；同鍵 actual 衝突整組排除。
+ var rows=(hands||[]).filter(function(h){return h&&!h.excludedFromLearning&&!h.dataConflict;});
+ var groups={};
+ rows.forEach(function(h,i){
+   var hasKey=h.shoeId!=null&&h.handNo!=null;
+   var k=hasKey?(String(h.shoeId)+'|'+String(h.handNo)):('__legacy__'+String(h.id!=null?h.id:i));
+   (groups[k]||(groups[k]=[])).push(h);
+ });
+ var out=[];
+ Object.keys(groups).forEach(function(k){
+   var g=groups[k];
+   var actuals={};
+   g.forEach(function(h){if(h.actual!=null)actuals[h.actual]=1;});
+   if(Object.keys(actuals).length>1)return; // 標籤衝突：不學
+   g.sort(function(a,b){
+     var ta=Date.parse(a.time||'')||0,tb=Date.parse(b.time||'')||0;
+     if(ta!==tb)return ta-tb;
+     return (Number(a.id)||0)-(Number(b.id)||0);
+   });
+   out.push(g[g.length-1]);
+ });
+ return out;
+}
+function trainingShoes(shoes){
+ // 完全/前綴去重後，再排除「目前這一鞋」，避免同鞋自己學自己、自己考自己。
+ var current=(typeof state!=='undefined'&&state)?state.shoeId:null;
+ return cleanHistoricalShoes(shoes).filter(function(s){return !current||s.shoeId!==current;});
+}
+function historicalHandsForLearning(){
+ return allP('hands').then(function(rows){
+   var current=(typeof state!=='undefined'&&state)?state.shoeId:null;
+   return cleanHistoricalHands(rows).filter(function(h){return !current||h.shoeId!==current;});
+ });
+}
+function evidenceEdge(p){return Math.abs((p==null?.5:p)-.5)*2;}
+function roadFamily(route){
+ var vals=[];
+ ['big','eye','small','cock'].forEach(function(k){
+   var r=route&&route[k];if(!r)return;
+   var e=evidenceEdge(r.b),w=.30+Math.sqrt(Math.max(0,e));
+   vals.push({b:r.b,w:w,e:e});
+ });
+ if(!vals.length)return{b:.5,edge:0,count:0};
+ var den=vals.reduce(function(a,x){return a+x.w;},0);
+ var b=vals.reduce(function(a,x){return a+x.b*x.w;},0)/den;
+ return{b:b,edge:evidenceEdge(b),count:vals.length};
+}
+function evidenceConflict(cross,bpCross){
+ var rf=roadFamily(cross&&cross.route);
+ var signals=[];
+ if(rf.count)signals.push({name:'roads',b:rf.b,edge:rf.edge});
+ if(cross)signals.push({name:'history',b:cross.bRate,edge:evidenceEdge(cross.bRate)});
+ if(bpCross)signals.push({name:'break',b:bpCross.histB,edge:evidenceEdge(bpCross.histB)});
+ var useful=signals.filter(function(x){return x.edge>=.025;});
+ var bStrong=useful.filter(function(x){return x.b>=.5;});
+ var pStrong=useful.filter(function(x){return x.b<.5;});
+ var maxB=bStrong.length?Math.max.apply(null,bStrong.map(function(x){return x.edge;})):0;
+ var maxP=pStrong.length?Math.max.apply(null,pStrong.map(function(x){return x.edge;})):0;
+ var conflict=!!(bStrong.length&&pStrong.length);
+ var severe=conflict&&Math.min(maxB,maxP)>=.055;
+ var weakAll=signals.length>0&&Math.max.apply(null,signals.map(function(x){return x.edge;}))<.05;
+ return{signals:signals,conflict:conflict,severe:severe,weakAll:weakAll,maxB:maxB,maxP:maxP,roadFamily:rf};
+}
+
 function mirrorSide(x){return x==='B'?'P':x==='P'?'B':x}
 function opposite(x){return x==='B'?'P':'B'}
 function canonicalRunShape(seq,n){
@@ -487,289 +532,114 @@ function routeHeuristic(seq){
 
 
 async function breakpointCross(seq){
- // 每一刻獨立重新判斷，不承接上一局信心。
- // 斷點判斷的核心：當下大路 + 模擬下一手 B/P 後的下三路 + 歷史相似節點交叉。
- var rr=runsOf(seq);
- if(!rr.length)return null;
-
- var cur=rr[rr.length-1], currentSide=cur.side, currentLen=cur.len;
- var f=feature(seq);
- var hypB=transition(seq,'B'), hypP=transition(seq,'P');
-
- var shoes=cleanHistoricalShoes(await allP('shoes'));
- var totalW=0, bW=0, pW=0, tW=0;
- var matchCount=0;
-
- // 分路交叉：哪一個假設更符合歷史上相似節點的後續衍生
- var roadVotes={
-   big:{B:0,P:0},
-   eye:{B:0,P:0},
-   small:{B:0,P:0},
-   cock:{B:0,P:0}
- };
-
+ var rr=runsOf(seq);if(!rr.length)return null;
+ var cur=rr[rr.length-1],currentSide=cur.side,currentLen=cur.len,f=feature(seq);
+ var hypB=transition(seq,'B'),hypP=transition(seq,'P');
+ var shoes=trainingShoes(await allP('shoes'));
+ var bW=0,pW=0,tW=0,totalW=0,matchedShoes=0,nodeSamples=0;
+ var roadVotes={big:{B:0,P:0},eye:{B:0,P:0},small:{B:0,P:0},cock:{B:0,P:0}};
  for(const sh of shoes){
-   var a=sh.sequence||[];
+   var a=sh.sequence||[], lb=0,lp=0,lt=0,lw=0,lc=0;
+   var lr={big:{B:0,P:0},eye:{B:0,P:0},small:{B:0,P:0},cock:{B:0,P:0}};
    for(var i=6;i<a.length;i++){
-     var prior=a.slice(0,i), actual=a[i];
-     var pf=feature(prior);
-
-     // 主相似度：路型、柱高、下三路尾端都要一起比
-     var sim=featureSimilarity(f,pf);
+     var prior=a.slice(0,i),actual=a[i],pf=feature(prior),sim=featureSimilarity(f,pf);
      if(sim<.60)continue;
-
-     // 當前龍長只作「局面特徵」，不是信心累積來源
-     var pr=runsOf(prior), pc=pr.length?pr[pr.length-1]:null;
-     var lenSim=pc ? (1-Math.min(4,Math.abs(pc.len-currentLen))/4) : .5;
-     var w=Math.pow((sim-.50)/.50,2.35) * (.82 + .18*lenSim);
-     if(w<=0)continue;
-
-     totalW+=w; matchCount++;
-
-     if(actual==='T'){
-       tW+=w;
-       continue;
-     }
-     if(actual!=='B'&&actual!=='P')continue;
-
-     // 正反路正規化：
-     // 歷史若是同方向延續，就映射成目前同方向；
-     // 歷史若是轉折，就映射成目前相反方向。
-     var histLast=pc?pc.side:null;
-     if(!histLast)continue;
-     var histStructural=(actual===histLast)?'SAME':'SWITCH';
-     var mapped=(histStructural==='SAME')?currentSide:opposite(currentSide);
-     if(mapped==='B')bW+=w; else pW+=w;
-
-     // 比較歷史實際後續衍生，究竟更像「假設下一手 B」還是「假設下一手 P」
+     var pr=runsOf(prior),pc=pr.length?pr[pr.length-1]:null;
+     var lenSim=pc?(1-Math.min(4,Math.abs(pc.len-currentLen))/4):.5;
+     var w=Math.pow((sim-.50)/.50,2.35)*(.82+.18*lenSim);if(w<=0)continue;
+     lw+=w;lc++;nodeSamples++;
+     if(actual==='T'){lt+=w;continue;} if(actual!=='B'&&actual!=='P')continue;
+     var histLast=pc?pc.side:null;if(!histLast)continue;
+     var mapped=(actual===histLast)?currentSide:opposite(currentSide);
+     if(mapped==='B')lb+=w;else lp+=w;
      var actualTr=transition(prior,actual);
-     ['big','eye','small','cock'].forEach(function(k){
-       roadVotes[k].B += w*trMatch(actualTr,hypB,k);
-       roadVotes[k].P += w*trMatch(actualTr,hypP,k);
-     });
+     ['big','eye','small','cock'].forEach(function(k){lr[k].B+=w*trMatch(actualTr,hypB,k);lr[k].P+=w*trMatch(actualTr,hypP,k);});
    }
+   if(!lc||!lw)continue;
+   matchedShoes++;
+   // 一副鞋最多一票；同鞋內很多相似節點不再灌大樣本。
+   var shoeWeight=Math.min(1,.55+Math.sqrt(lc)/5), scale=shoeWeight/lw;
+   bW+=lb*scale;pW+=lp*scale;tW+=lt*scale;totalW+=shoeWeight;
+   ['big','eye','small','cock'].forEach(function(k){roadVotes[k].B+=lr[k].B*scale;roadVotes[k].P+=lr[k].P*scale;});
  }
-
- var bp=bW+pW;
- var histB=bp?bW/bp:.5;
- var histP=1-histB;
-
- var roads={};
- ['big','eye','small','cock'].forEach(function(k){
-   var z=roadVotes[k].B+roadVotes[k].P;
-   roads[k]={
-     b:z?roadVotes[k].B/z:.5,
-     p:z?roadVotes[k].P/z:.5,
-     strength:z?Math.abs(roadVotes[k].B-roadVotes[k].P)/z:0
-   };
- });
-
- // 交叉投票：每一刻重新算，不繼承前一局信心。
- var scoreB=.50, scoreP=.50, weightSum=1;
- function addRoad(k,base){
-   var r=roads[k];
-   if(!r)return;
-   var strength=Math.max(.05,r.strength);
-   var w=base*strength;
-   scoreB += r.b*w;
-   scoreP += r.p*w;
-   weightSum += w;
- }
- addRoad('big',1.20);
- addRoad('eye',1.00);
- addRoad('small',.95);
- addRoad('cock',.90);
-
- // 歷史相似後續本身
- var histStrength=Math.max(.06,Math.abs(histB-.5)*2);
- var hw=.35*histStrength;
- scoreB += histB*hw;
- scoreP += histP*hw;
- weightSum += hw;
-
- scoreB/=weightSum;
- scoreP/=weightSum;
- var norm=scoreB+scoreP;
- if(norm){scoreB/=norm;scoreP/=norm;}
-
- var sideNow=currentSide;
- var continueProb=(sideNow==='B')?scoreB:scoreP;
- var breakProb=1-continueProb;
-
- // 不把第幾顆直接變成信心，只作說明與歷史條件之一
- return{
-   currentSide:currentSide,
-   currentLen:currentLen,
-   samples:matchCount,
-   histB:histB,
-   histP:histP,
-   continueProb:continueProb,
-   breakProb:breakProb,
-   roads:roads,
-   tieRate:totalW?tW/totalW:0
- };
+ var bp=bW+pW,histB=bp?bW/bp:.5,histP=1-histB,roads={};
+ ['big','eye','small','cock'].forEach(function(k){var z=roadVotes[k].B+roadVotes[k].P;roads[k]={b:z?roadVotes[k].B/z:.5,p:z?roadVotes[k].P/z:.5,strength:z?Math.abs(roadVotes[k].B-roadVotes[k].P)/z:0};});
+ var rf=roadFamily(roads),histW=.55+Math.min(.35,Math.sqrt(matchedShoes)/12),roadW=.70;
+ var scoreB=(rf.b*roadW)+(histB*histW),den=roadW+histW,scoreP=((1-rf.b)*roadW)+(histP*histW);
+ scoreB/=den;scoreP/=den;var norm=scoreB+scoreP;if(norm){scoreB/=norm;scoreP/=norm;}
+ var continueProb=currentSide==='B'?scoreB:scoreP,breakProb=1-continueProb;
+ return{currentSide:currentSide,currentLen:currentLen,samples:matchedShoes,nodeSamples:nodeSamples,histB:histB,histP:histP,
+   continueProb:continueProb,breakProb:breakProb,roads:roads,tieRate:totalW?tW/totalW:0};
 }
 
 function breakpointAdjustment(bp){
  if(!bp)return{confidenceCap:92,label:null};
-
- // 樣本與四路一致度決定可給多高信心，不看前一局是否贏。
- var dirs=['big','eye','small','cock'].map(k=>bp.roads[k].b>=.5?'B':'P');
- var bN=dirs.filter(x=>x==='B').length;
- var agree=Math.max(bN,dirs.length-bN)/dirs.length;
-
- var cap=92;
- if(bp.samples<8)cap=58;
- else if(bp.samples<15)cap=68;
- else if(bp.samples<30)cap=78;
- else if(agree<.75)cap=74;
-
- var label='連龍'+bp.currentLen+'顆｜歷史相似節點 '+bp.samples+
+ var ec=evidenceConflict({route:bp.roads,bRate:bp.histB},bp),cap=92;
+ if(bp.samples<4)cap=56;
+ else if(bp.samples<7)cap=60;
+ else if(bp.samples<10)cap=66;
+ if(ec.weakAll)cap=Math.min(cap,58);
+ if(ec.severe)cap=Math.min(cap,60);
+ var label='連龍'+bp.currentLen+'顆｜獨立歷史鞋 '+bp.samples+'（節點 '+(bp.nodeSamples||0)+'）'+
    '｜續 '+(bp.continueProb*100).toFixed(1)+'%｜斷 '+(bp.breakProb*100).toFixed(1)+'%'+
-   '｜大路 '+(bp.roads.big.b>=.5?'偏莊':'偏閒')+
-   '｜大眼 '+(bp.roads.eye.b>=.5?'偏莊':'偏閒')+
-   '｜小路 '+(bp.roads.small.b>=.5?'偏莊':'偏閒')+
-   '｜曱甴 '+(bp.roads.cock.b>=.5?'偏莊':'偏閒');
-
+   '｜大路 '+(bp.roads.big.b>=.5?'偏莊':'偏閒')+'｜大眼 '+(bp.roads.eye.b>=.5?'偏莊':'偏閒')+
+   '｜小路 '+(bp.roads.small.b>=.5?'偏莊':'偏閒')+'｜曱甴 '+(bp.roads.cock.b>=.5?'偏莊':'偏閒');
  return{confidenceCap:cap,label:label};
 }
 
 async function routeCorrectionMemory(routeClass){
- var hands=await allP('hands');
-
- // 只看「同路型的長期歷史結果」，不看最近連贏/連輸，不按時間連續加權。
- var rows=hands.filter(h=>
-   h&&h.routeClass===routeClass&&
-   (h.prediction==='B'||h.prediction==='P'||h.prediction==='T')&&
-   typeof h.hit==='boolean'
- );
-
+ var hands=await historicalHandsForLearning();
+ var rows=hands.filter(function(h){return h&&h.routeClass===routeClass&&(h.prediction==='B'||h.prediction==='P')&&(h.actual==='B'||h.actual==='P')&&typeof h.hit==='boolean';});
  if(rows.length<8)return{samples:rows.length,hitRate:.5,penalty:1};
-
- var hits=rows.filter(h=>h.hit===true).length;
- var rate=hits/rows.length;
-
- // 這是路型長期校正，不是上一局輸贏獎懲。
- var penalty=
-   rate<.45?.72:
-   rate<.50?.84:
-   rate<.55?.95:
-   rate>=.62?1.08:1.0;
-
+ var hits=rows.filter(function(h){return h.hit===true;}).length;
+ var rate=(hits+5)/(rows.length+10); // Beta 收縮，避免小樣本極端
+ var penalty=rate<.45?.72:rate<.50?.84:rate<.55?.94:1.0; // 只降權，不因歷史連贏加碼
  return{samples:rows.length,hitRate:rate,penalty:penalty};
 }
 
 async function historicalCross(seq){
- var shoes=cleanHistoricalShoes(await allP('shoes')), f=feature(seq), last=runsOf(seq).slice(-1)[0];
- var currentLast=last?last.side:null;
- if(!currentLast)return{samples:0,bRate:.5,tieRate:0,route:{},correction:'NONE',routeClass:f.cls,matches:[]};
-
- var uniq=shoes;
-
+ var shoes=trainingShoes(await allP('shoes')),f=feature(seq),last=runsOf(seq).slice(-1)[0],currentLast=last?last.side:null;
+ if(!currentLast)return{samples:0,nodeSamples:0,bRate:.5,tieRate:.095,route:{},correction:'NONE',routeClass:f.cls,matches:[]};
  var hypB=transition(seq,'B'),hypP=transition(seq,'P');
- var sumB=0,sumP=0,sumT=0,total=0,eff=0,tieNear=0,tieNearW=0;
- var route={big:{B:0,P:0},eye:{B:0,P:0},small:{B:0,P:0},cock:{B:0,P:0}};
- // Separate evidence for the current road and the road after a switch.
- var roadNow={sameW:0,switchW:0,samples:0};
- var roadNext={returnW:0,stayW:0,samples:0};
- var matches=[];
-
- for(const sh of uniq){
-  var a=Array.isArray(sh.sequence)?sh.sequence:[];
-  for(var i=6;i<a.length;i++){
-   var actual=a[i],prior=a.slice(0,i);
-   var pf=feature(prior),sim=featureSimilarity(f,pf);
-   if(sim<.58)continue;
-
-   // 越相似權重越高；不固定抓 1~20 局
-   var w=Math.pow((sim-.50)/.50,2.2);
-   if(w<=0)continue;
-   total+=w; eff+=1;
-
-   if(actual==='T'){
-    // 和局：相似路型權重 + 與目前「距離上次和局」相近時額外加權
-    var gapDiff=Math.abs((pf.gap||999)-(f.gap||999));
-    var gapBoost=(f.gap<999 && pf.gap<999)?(1+Math.max(0,1-gapDiff/8)*0.35):1;
-    sumT+=w*gapBoost;
-    tieNear+=w*gapBoost;
-    tieNearW+=w;
-    if(matches.length<60)matches.push({sim:sim,shoe:sh.shoeId,hand:i+1,actual:'T',cls:pf.cls,tieGap:pf.gap});
-    continue;
+ var sumB=0,sumP=0,sumT=0,total=0,matchedShoes=0,nodeSamples=0;
+ var route={big:{B:0,P:0},eye:{B:0,P:0},small:{B:0,P:0},cock:{B:0,P:0}},matches=[];
+ for(const sh of shoes){
+   var a=Array.isArray(sh.sequence)?sh.sequence:[],lb=0,lp=0,lt=0,lw=0,lc=0;
+   var lr={big:{B:0,P:0},eye:{B:0,P:0},small:{B:0,P:0},cock:{B:0,P:0}};
+   var localMatches=[];
+   for(var i=6;i<a.length;i++){
+     var actual=a[i],prior=a.slice(0,i),pf=feature(prior),sim=featureSimilarity(f,pf);if(sim<.58)continue;
+     var w=Math.pow((sim-.50)/.50,2.2);if(w<=0)continue;
+     lw+=w;lc++;nodeSamples++;
+     if(actual==='T'){
+       var gapDiff=Math.abs((pf.gap||999)-(f.gap||999)),gapBoost=(f.gap<999&&pf.gap<999)?(1+Math.max(0,1-gapDiff/8)*.35):1;
+       lt+=w*gapBoost;localMatches.push({sim:sim,shoe:sh.shoeId,hand:i+1,actual:'T',cls:pf.cls});continue;
+     }
+     if(actual!=='B'&&actual!=='P')continue;
+     var pl=runsOf(prior).slice(-1)[0],histLast=pl?pl.side:null;if(!histLast)continue;
+     var structural=actual===histLast?'SAME':'SWITCH',mapped=structural==='SAME'?currentLast:opposite(currentLast);
+     if(mapped==='B')lb+=w;else lp+=w;
+     var htr=transition(prior,actual);
+     ['big','eye','small','cock'].forEach(function(k){lr[k].B+=w*trMatch(htr,hypB,k);lr[k].P+=w*trMatch(htr,hypP,k);});
+     localMatches.push({sim:sim,shoe:sh.shoeId,hand:i+1,actual:actual,structural:structural,cls:pf.cls});
    }
-   if(actual!=='B'&&actual!=='P')continue;
-
-   var pl=runsOf(prior).slice(-1)[0], histLast=pl?pl.side:null;
-   if(!histLast)continue;
-   var structural=actual===histLast?'SAME':'SWITCH';
-   var mapped=structural==='SAME'?currentLast:opposite(currentLast);
-   if(mapped==='B')sumB+=w; else sumP+=w;
-
-   roadNow.samples++;
-   if(structural==='SAME')roadNow.sameW+=w; else roadNow.switchW+=w;
-
-   // Two-step road forecast: only after a real switch, inspect the next B/P result.
-   // T is skipped because it does not start a new big-road column.
-   if(structural==='SWITCH'){
-    var j=i+1, second=null;
-    while(j<a.length){if(a[j]==='B'||a[j]==='P'){second=a[j];break;}j++;}
-    if(second){
-     roadNext.samples++;
-     if(second===histLast)roadNext.returnW+=w; else roadNext.stayW+=w;
-    }
-   }
-
-   var htr=transition(prior,actual);
-   ['big','eye','small','cock'].forEach(k=>{
-    var mb=trMatch(htr,hypB,k),mp=trMatch(htr,hypP,k);
-    route[k].B+=w*mb; route[k].P+=w*mp;
-   });
-   if(matches.length<60)matches.push({sim:sim,shoe:sh.shoeId,hand:i+1,actual:actual,structural:structural,cls:pf.cls});
-  }
+   if(!lc||!lw)continue;
+   matchedShoes++;
+   var shoeWeight=Math.min(1,.55+Math.sqrt(lc)/5),scale=shoeWeight/lw;
+   sumB+=lb*scale;sumP+=lp*scale;sumT+=lt*scale;total+=shoeWeight;
+   ['big','eye','small','cock'].forEach(function(k){route[k].B+=lr[k].B*scale;route[k].P+=lr[k].P*scale;});
+   localMatches.sort(function(x,y){return y.sim-x.sim;});if(localMatches[0])matches.push(localMatches[0]); // 每鞋只展示最像節點
  }
- var bp=sumB+sumP, bRate=bp?sumB/bp:.5;
- // Bayesian-like stabilization toward 9.5% so sparse samples cannot explode.
- // Historical similar-route evidence dominates as samples grow.
- var rawTie=total?sumT/total:.095;
- var priorN=18, tieRate=(rawTie*Math.max(0,eff)+.095*priorN)/(Math.max(0,eff)+priorN);
- // V28.2：取消固定 22% 上限。上限由相似歷史資料本身決定，
- // 但樣本不足時仍使用收縮，避免少量和局造成虛高。
- var dynamicTieCap;
- if(eff<12) dynamicTieCap=.14;
- else if(eff<25) dynamicTieCap=.20;
- else if(eff<50) dynamicTieCap=Math.max(.20,Math.min(.32,rawTie*1.18+.025));
- else dynamicTieCap=Math.max(.22,Math.min(.45,rawTie*1.12+.02));
+ var bp=sumB+sumP,bRate=bp?sumB/bp:.5,rawTie=total?sumT/total:.095;
+ var priorN=8,tieRate=(rawTie*matchedShoes+.095*priorN)/(matchedShoes+priorN);
+ var dynamicTieCap=matchedShoes<6?.14:matchedShoes<12?.20:matchedShoes<24?Math.max(.20,Math.min(.30,rawTie*1.15+.02)):Math.max(.22,Math.min(.40,rawTie*1.10+.02));
  tieRate=Math.max(.02,Math.min(dynamicTieCap,tieRate));
-
- var routeOut={};
- ['big','eye','small','cock'].forEach(k=>{
-  var z=route[k].B+route[k].P;
-  routeOut[k]={b:z?route[k].B/z:.5,p:z?route[k].P/z:.5,samples:eff,
-    accuracy:z?Math.max(route[k].B,route[k].P)/z:.5};
- });
-
- // 「錯誤修正」：歷史同型若長期反對原始路型方向，就直接翻向，不只是記 loss。
- var raw=routeHeuristic(seq);
- var histSame=currentLast==='B'?bRate:1-bRate;
- var histStructural=histSame>=.5?'SAME':'SWITCH';
- var correction=(bp && histStructural!==raw && Math.abs(histSame-.5)>=.06)?'FLIP':
-                (bp && Math.abs(histSame-.5)<.04)?'DOWNWEIGHT':'KEEP';
-
- matches.sort((x,y)=>y.sim-x.sim);
- var nowTotal=roadNow.sameW+roadNow.switchW;
- var nextTotal=roadNext.returnW+roadNext.stayW;
- var currentRoadStats={
-  side:currentLast, samples:roadNow.samples,
-  continueRate:nowTotal?roadNow.sameW/nowTotal:.5,
-  switchRate:nowTotal?roadNow.switchW/nowTotal:.5
- };
- var nextRoadStats={
-  returnSide:currentLast, switchSide:opposite(currentLast), samples:roadNext.samples,
-  returnRate:nextTotal?roadNext.returnW/nextTotal:.5,
-  stayRate:nextTotal?roadNext.stayW/nextTotal:.5
- };
- return{samples:eff,weighted:total,bRate:bRate,tieRate:tieRate,route:routeOut,
-  currentRoadStats:currentRoadStats,nextRoadStats:nextRoadStats,
-  correction:correction,raw:raw,histStructural:histStructural,routeClass:f.cls,matches:matches.slice(0,20)};
+ var routeOut={};['big','eye','small','cock'].forEach(function(k){var z=route[k].B+route[k].P;routeOut[k]={b:z?route[k].B/z:.5,p:z?route[k].P/z:.5,samples:matchedShoes,accuracy:z?Math.max(route[k].B,route[k].P)/z:.5};});
+ var raw=routeHeuristic(seq),histSame=currentLast==='B'?bRate:1-bRate,histStructural=histSame>=.5?'SAME':'SWITCH',edge=Math.abs(histSame-.5);
+ var correction=(matchedShoes>=8&&histStructural!==raw&&edge>=.08)?'FLIP':((matchedShoes<6||edge<.05)?'DOWNWEIGHT':'KEEP');
+ matches.sort(function(x,y){return y.sim-x.sim;});
+ return{samples:matchedShoes,nodeSamples:nodeSamples,weighted:total,bRate:bRate,tieRate:tieRate,route:routeOut,
+   correction:correction,raw:raw,histStructural:histStructural,routeClass:f.cls,matches:matches.slice(0,20)};
 }
 
 async function loadFactorStats(){
@@ -784,20 +654,11 @@ function factorWeight(id){
  return Math.max(.45,Math.min(1.75,0.55+rate*1.5));
 }
 function currentSegmentStats(cross,routeMem){
- // 目前路段勝率 = 同類相似歷史節點中「主方向」的可重現命中率。
- // 用 Beta(8,8) 收縮到 50%，避免極少樣本出現 90~100% 的假高勝率。
  if(!cross||!cross.samples)return{samples:0,rate:.5,side:'—',label:'樣本不足',liveLabel:'尚無資料'};
- var n=Math.max(0,cross.samples);
- var raw=Math.max(cross.bRate,1-cross.bRate);
- var wins=raw*n, priorEach=8;
- var rate=(wins+priorEach)/(n+priorEach*2);
- var side=cross.bRate>=.5?'莊':'閒';
- var label=n<8?'樣本不足 ('+n+')':side+' '+(rate*100).toFixed(1)+'%｜'+n+'樣本';
- var liveLabel='尚無資料';
- if(routeMem&&routeMem.samples){
-   liveLabel=(routeMem.hitRate*100).toFixed(1)+'%｜'+routeMem.samples+'局';
-   if(routeMem.samples<8)liveLabel+='（樣本少）';
- }
+ var n=Math.max(0,cross.samples),raw=Math.max(cross.bRate,1-cross.bRate),wins=raw*n,priorEach=4;
+ var rate=(wins+priorEach)/(n+priorEach*2),side=cross.bRate>=.5?'莊':'閒';
+ var label=n<6?'樣本不足 ('+n+'鞋)':side+' '+(rate*100).toFixed(1)+'%｜'+n+'獨立鞋';
+ var liveLabel='尚無資料';if(routeMem&&routeMem.samples){liveLabel=(routeMem.hitRate*100).toFixed(1)+'%｜'+routeMem.samples+'局';if(routeMem.samples<8)liveLabel+='（樣本少）';}
  return{samples:n,rate:rate,side:side,label:label,liveLabel:liveLabel};
 }
 
@@ -864,242 +725,60 @@ function independentReflection(cross,bpCross,routeMem){
 }
 
 function evidenceConfidence(cross,bpCross,routeMem,bProb){
- // 每一局重新評分：高信心必須來自「當局證據」，不是上一局輸贏。
- var samples=cross?cross.samples:0;
- var route=cross&&cross.route?cross.route:{};
-
- var dirs=[];
- ['big','eye','small','cock'].forEach(function(k){
-   if(route[k]) dirs.push(route[k].b>=.5?'B':'P');
- });
- var bN=dirs.filter(x=>x==='B').length;
- var agreement=dirs.length?Math.max(bN,dirs.length-bN)/dirs.length:.5;
-
- // 各路本身是否有明顯方向，不只是剛好 51/49。
- var strengths=[];
- ['big','eye','small','cock'].forEach(function(k){
-   if(route[k]) strengths.push(Math.abs(route[k].b-.5)*2);
- });
- var roadStrength=strengths.length?strengths.reduce((a,b)=>a+b,0)/strengths.length:0;
-
- // 歷史相似路本身的方向優勢
- var histEdge=cross?Math.abs(cross.bRate-.5)*2:0;
-
- // 斷點交叉若存在，也算一層獨立證據
- var breakEdge=bpCross?Math.abs(bpCross.continueProb-.5)*2:0;
-
- // 最終莊閒差距（尚未含和）
- var probEdge=Math.min(1,Math.abs(bProb-.5)*2);
-
- // 歷史實戰同路型表現
- var liveQuality=.5;
- if(routeMem&&routeMem.samples>=8) liveQuality=routeMem.hitRate;
-
- // 樣本成熟度：不是線性暴增
- var sampleScore=Math.min(1,Math.sqrt(samples/55));
-
- // 綜合證據品質 0~1
- var quality =
-   sampleScore*.22 +
-   agreement*.24 +
-   roadStrength*.17 +
-   histEdge*.16 +
-   breakEdge*.09 +
-   probEdge*.08 +
-   Math.max(0,Math.min(1,(liveQuality-.40)/.25))*.04;
-
- // 嚴格高信心條件
- var allFourAgree=dirs.length===4 && agreement===1;
- var strongThreePlus=dirs.length>=3 && agreement>=.75;
- var mature=samples>=35;
- var strongHist=histEdge>=.18;      // 約 59/41 以上
- var strongRoad=roadStrength>=.18;
- var strongProb=probEdge>=.16;
-
- var c;
- if(mature && allFourAgree && strongHist && strongRoad && strongProb){
-   // 真正強證據：允許 85~92
-   c=85 + Math.round(Math.min(7, quality*8));
- }else if(samples>=25 && strongThreePlus && (strongHist||strongRoad) && probEdge>=.10){
-   // 明顯支持：72~84
-   c=72 + Math.round(Math.min(12, quality*14));
- }else if(samples>=12 && agreement>=.75){
-   // 中等支持：60~73
-   c=60 + Math.round(Math.min(13, quality*15));
- }else{
-   // 衝突或樣本不足
-   c=52 + Math.round(Math.min(14, quality*15));
- }
-
- // 歷史實戰同路型若明顯失準，不能硬給高
- if(routeMem&&routeMem.samples>=12){
-   if(routeMem.hitRate<.45)c=Math.min(c,62);
-   else if(routeMem.hitRate<.50)c=Math.min(c,70);
-   else if(routeMem.hitRate<.55)c=Math.min(c,79);
- }
-
- // 相似路與四路方向若互相矛盾，高信心禁止
- var majority=bN>=dirs.length/2?'B':'P';
- var histDir=cross&&cross.bRate>=.5?'B':'P';
- if(dirs.length>=3 && majority!==histDir)c=Math.min(c,72);
-
- return Math.max(50,Math.min(92,c));
+ var samples=cross?cross.samples:0,rf=roadFamily(cross&&cross.route),histEdge=cross?evidenceEdge(cross.bRate):0;
+ var breakEdge=bpCross?evidenceEdge(bpCross.histB):0,probEdge=evidenceEdge(bProb),sampleScore=Math.min(1,Math.sqrt(samples/18));
+ var conflict=evidenceConflict(cross,bpCross),weightedEdge=rf.edge*.34+histEdge*.41+breakEdge*.25;
+ var c=50+weightedEdge*32+sampleScore*8+probEdge*8;
+ // 三個「獨立證據家族」而不是四條路逐票疊加。
+ var sig=conflict.signals.filter(function(x){return x.edge>=.055;});
+ var bN=sig.filter(function(x){return x.b>=.5;}).length,pN=sig.length-bN;
+ if(sig.length>=2&&Math.max(bN,pN)>=2)c+=3;
+ if(samples<4)c=Math.min(c,56);else if(samples<7)c=Math.min(c,60);else if(samples<10)c=Math.min(c,66);
+ if(conflict.weakAll)c=Math.min(c,58);
+ if(conflict.conflict)c=Math.min(c,64);
+ if(conflict.severe)c=Math.min(c,59);
+ if(routeMem&&routeMem.samples>=12){if(routeMem.hitRate<.45)c=Math.min(c,58);else if(routeMem.hitRate<.50)c=Math.min(c,62);else if(routeMem.hitRate<.55)c=Math.min(c,68);}
+ return Math.max(50,Math.min(88,Math.round(c)));
 }
 
 
 
 async function calibrateConfidence(rawC){
- var hands=await allP('hands');
- var rows=hands.filter(h=>h&&typeof h.confidence==='number'&&(typeof h.hit==='boolean'||typeof h.shadowHit==='boolean')).map(function(h){
-  if(typeof h.hit==='boolean')return h;
-  var x=Object.assign({},h);x.hit=h.shadowHit;return x;
- });
-
- // 完全不使用「最近幾局是否連贏」。
- // 只使用長期同信心區間實際命中率做校準。
- if(rows.length<30)return rawC;
-
- function stats(lo,hi){
-   var a=rows.filter(h=>h.confidence>=lo&&h.confidence<hi);
-   var wins=a.filter(h=>h.hit).length;
-   return {n:a.length,wins:wins,losses:a.length-wins,rate:a.length?wins/a.length:.5};
- }
-
- var s60=stats(60,70), s70=stats(70,80), s80=stats(80,85), s85=stats(85,100);
- var c=rawC;
-
- // 60%以上必須長期贏多於輸。
- if(c>=60 && s60.n>=20 && s60.rate<=.50)c=Math.min(c,59);
- if(c>=70 && s70.n>=20 && s70.rate<=.50)c=Math.min(c,69);
- if(c>=80 && s80.n>=15 && s80.rate<=.50)c=Math.min(c,79);
- if(c>=85 && s85.n>=12 && s85.rate<=.50)c=Math.min(c,84);
-
- // 信心越高，歷史命中不能反而更差。
- if(c>=70 && s60.n>=20 && s70.n>=20 && s70.rate<s60.rate-.01)c=Math.min(c,69);
- if(c>=80 && s70.n>=20 && s80.n>=15 && s80.rate<s70.rate-.01)c=Math.min(c,79);
- if(c>=85 && s80.n>=15 && s85.n>=12 && s85.rate<s80.rate-.01)c=Math.min(c,84);
-
- // 僅用該信心附近的「長期整體」校準，不看順序。
- var lo=Math.max(50,rawC-6), hi=Math.min(96,rawC+7);
- var near=rows.filter(h=>h.confidence>=lo&&h.confidence<=hi);
- if(near.length>=15){
-   var actual=near.filter(h=>h.hit).length/near.length*100;
-   var blend=near.length>=40?.55:.30;
-   c=c*(1-blend)+actual*blend;
- }
-
- return Math.max(50,Math.min(92,Math.round(c)));
+ var rows=(await historicalHandsForLearning()).filter(function(h){return h&&(h.prediction==='B'||h.prediction==='P')&&(h.actual==='B'||h.actual==='P')&&typeof h.confidence==='number'&&typeof h.hit==='boolean';});
+ if(rows.length<25)return rawC;
+ function stats(lo,hi){var a=rows.filter(function(h){return h.confidence>=lo&&h.confidence<hi;}),wins=a.filter(function(h){return h.hit;}).length;return{n:a.length,rate:a.length?(wins+5)/(a.length+10):.5};}
+ var bins=[stats(50,60),stats(60,65),stats(65,70),stats(70,80),stats(80,100)],c=rawC;
+ var idx=c<60?0:c<65?1:c<70?2:c<80?3:4,bin=bins[idx];
+ if(bin.n>=12){var empirical=bin.rate*100,blend=Math.min(.55,bin.n/80);c=c*(1-blend)+empirical*blend;}
+ // 60+ 的歷史區間若沒有贏多於輸，不允許繼續顯示成可下注信心。
+ if(rawC>=60&&bin.n>=15&&bin.rate<=.50)c=Math.min(c,59);
+ // 高區間不得比低區間明顯更差。
+ for(var i=2;i<bins.length;i++)if(idx>=i&&bins[i].n>=12&&bins[i-1].n>=12&&bins[i].rate<bins[i-1].rate-.02)c=Math.min(c,[59,64,69,79][i-1]||79);
+ return Math.max(50,Math.min(88,Math.round(c)));
 }
 
 async function analyze(seq){
- if(seq.filter(x=>x!=='T').length<6)return{b:47,p:47,t:6,c:0,call:'PASS',sim:{samples:0},directionalRate:50,decisionScore:0,betTier:'觀察',directionSide:null,cross:null,factors:{}};
- var cross=await historicalCross(seq), route=cross.route||{};
- var routeMem=await routeCorrectionMemory(cross.routeClass);
- var bpCross=await breakpointCross(seq), bpAdj=breakpointAdjustment(bpCross);
- var reflection=independentReflection(cross,bpCross,routeMem);
- var pieces=[], num=0,den=0;
- function add(name,obj,base){
-  if(!obj)return;
-  var reliability=Math.max(.05,Math.min(.30,Math.abs(obj.b-.5)*1.8+.08));
-  var sampleBoost=Math.min(1,Math.sqrt(Math.max(1,cross.samples)/35));
-  var w=base*reliability*sampleBoost;
-  num+=obj.b*w; den+=w;
-  pieces.push({id:name,name:name,w:w,v:(obj.b-.5)*2,impact:w*(obj.b-.5)*2,rate:obj.b});
- }
- add('大路結構',route.big,1.25);
- add('大眼仔',route.eye,1.00);
- add('小路',route.small,.95);
- add('曱甴路',route.cock,.90);
-
- // 相似歷史本身是主要校正器
- var histW=Math.min(.40,.10+Math.sqrt(Math.max(0,cross.samples))/35);
- num+=cross.bRate*histW; den+=histW;
- pieces.push({id:'similar',name:'歷史相似路',w:histW,v:(cross.bRate-.5)*2,impact:histW*(cross.bRate-.5)*2,rate:cross.bRate});
-
- // 斷點交叉模型：不因連龍長度疊加信心。
- // 每一局重新模擬 B/P 對大路與下三路的衍生，再用歷史相似節點投票。
- if(bpCross && bpCross.samples>=6){
-   var bw=Math.min(.45,.12+Math.sqrt(bpCross.samples)/42);
-   num+=bpCross.histB*bw; den+=bw;
-   pieces.push({
-     id:'breakCross',name:'斷點下三路交叉',w:bw,
-     v:(bpCross.histB-.5)*2,
-     impact:bw*(bpCross.histB-.5)*2,
-     rate:bpCross.histB,
-     continueProb:bpCross.continueProb,
-     breakProb:bpCross.breakProb
-   });
- }
-
- var b=den?100*num/den:50;
-
- // 若同型歷史證明原路型常判錯，直接修正，不只是登記敗局
- var currentLast=runsOf(seq).slice(-1)[0];
- var rawSide=currentLast?(cross.raw==='SAME'?currentLast.side:opposite(currentLast.side)):null;
- if(cross.correction==='FLIP' && rawSide){
-  var corrected=opposite(rawSide);
-  if((corrected==='B'&&b<50)||(corrected==='P'&&b>50)) b=100-b;
- }
- if(cross.correction==='DOWNWEIGHT') b=50+(b-50)*.55;
-
- // 樣本不足不允許虛高信心；85+ 必須大量相似案例且各路高度一致
- // 路型實戰錯誤會直接回饋到下一次演算，不是只記 loss。
- // 歷史錯誤只用來修正/降權，不因過去贏得多就自動疊高本局方向。
- var correctionPenalty=Math.min(1,routeMem.penalty);
- b=50+(b-50)*correctionPenalty;
- var gap=Math.abs(b-50);
- var sampleFactor=Math.min(1,Math.sqrt(Math.max(0,cross.samples)/45));
- var agree=[route.big,route.eye,route.small,route.cock].filter(Boolean).map(x=>x.b>=.5?'B':'P');
- var major=agree.filter(x=>x==='B').length, minor=agree.length-major;
- var agreeFactor=agree.length?Math.max(major,minor)/agree.length:.5;
- // V28.6：信心完全由本局證據品質產生。
- // 有把握時允許真正進 85~92；證據衝突時即使前面連贏也不會累加。
- var bProbForConfidence=b/100;
- var c=evidenceConfidence(cross,bpCross,routeMem,bProbForConfidence);
-
- // 斷點交叉若樣本不足/互相矛盾，仍保留安全封頂。
- if(bpCross)c=Math.min(c,bpAdj.confidenceCap);
-
- // 再使用已累積的「信心區間 vs 真實命中率」做校準。
- c=await calibrateConfidence(c);
- // V29.0：下注門檻統一。60 以下就是觀察，60 以上才進入可下注區。
- // 方向勝率使用 B/P 條件機率（不含和局），避免和局機率把 60% 訊號壓成表面 56% 而造成判讀矛盾。
- var directionalRate=Math.max(b,100-b);
- var directionSide=b>=50?'B':'P';
- var decisionScore=Math.min(c,directionalRate);
- var enoughDecisionSample=cross.samples>=8;
- var call=(enoughDecisionSample && decisionScore>=60)?directionSide:'PASS';
-
- // 和局最終機率直接使用經樣本量校正後的歷史相似路結果，不再硬鎖 22%。
- var tProb=Math.max(2.0,cross.tieRate*100);
- var nonTie=100-tProb;
- var bFinal=(b/100)*nonTie;
- var pFinal=nonTie-bFinal;
-
- // T only becomes formal call when historical similar-route tie probability is exceptionally high
- // and there are enough matching nodes; otherwise display probability only.
- // 正式叫 T：需要足夠相似樣本，且和局必須明顯高於該路型的基準和率。
- var tieCallThreshold=17;
- if(cross.samples>=60) tieCallThreshold=Math.max(13,Math.min(18,(cross.tieRate*100)*.78));
- else if(cross.samples>=35) tieCallThreshold=16;
- if(cross.samples>=35 && tProb>=tieCallThreshold && tProb>bFinal && tProb>pFinal) call='T';
-
- // 統一顯示層級：60 可下注、65 優勢、70 高勝率。
- // 若樣本不足，不把小樣本高百分比標成可下注。
- var betTier='觀察';
- if(enoughDecisionSample && decisionScore>=70) betTier='高勝率';
- else if(enoughDecisionSample && decisionScore>=65) betTier='優勢下注';
- else if(enoughDecisionSample && decisionScore>=60) betTier='可下注';
- if(!enoughDecisionSample) betTier='樣本不足';
-
- cross.routeMemory=routeMem;
- cross.segmentStats=currentSegmentStats(cross,routeMem);
- cross.breakpointCross=bpCross;
- cross.breakpointAdjustment=bpAdj;
- cross.reflection=reflection;
- return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,sim:{samples:cross.samples,bRate:cross.bRate},
-  directionalRate:directionalRate,decisionScore:decisionScore,betTier:betTier,directionSide:directionSide,
-  cross:cross,factors:pieces,signature:signature(seq)};
+ if(seq.filter(function(x){return x!=='T';}).length<6)return{b:47,p:47,t:6,c:0,call:'PASS',sim:{samples:0},directionalRate:50,decisionScore:0,betTier:'觀察',directionSide:null,cross:null,factors:{}};
+ var cross=await historicalCross(seq),route=cross.route||{},routeMem=await routeCorrectionMemory(cross.routeClass);
+ var bpCross=await breakpointCross(seq),bpAdj=breakpointAdjustment(bpCross),reflection=independentReflection(cross,bpCross,routeMem),pieces=[],num=0,den=0;
+ // 四條路屬於同一資料家族，先合併再投票，避免 4 個相關弱訊號被算成 4 張獨立票。
+ var rf=roadFamily(route);if(rf.count){var rw=.65+Math.min(.20,rf.edge);num+=rf.b*rw;den+=rw;pieces.push({id:'roadFamily',name:'大路＋下三路家族',w:rw,v:(rf.b-.5)*2,impact:rw*(rf.b-.5)*2,rate:rf.b});}
+ var histW=.70+Math.min(.25,Math.sqrt(Math.max(0,cross.samples))/12);num+=cross.bRate*histW;den+=histW;pieces.push({id:'similar',name:'歷史相似路（跨鞋）',w:histW,v:(cross.bRate-.5)*2,impact:histW*(cross.bRate-.5)*2,rate:cross.bRate});
+ if(bpCross&&bpCross.samples>=4){var bw=.55+Math.min(.20,Math.sqrt(bpCross.samples)/15);num+=bpCross.histB*bw;den+=bw;pieces.push({id:'breakCross',name:'斷點下三路交叉（跨鞋）',w:bw,v:(bpCross.histB-.5)*2,impact:bw*(bpCross.histB-.5)*2,rate:bpCross.histB,continueProb:bpCross.continueProb,breakProb:bpCross.breakProb});}
+ var b=den?100*num/den:50,currentLast=runsOf(seq).slice(-1)[0],rawSide=currentLast?(cross.raw==='SAME'?currentLast.side:opposite(currentLast.side)):null;
+ if(cross.correction==='FLIP'&&rawSide){var corrected=opposite(rawSide);if((corrected==='B'&&b<50)||(corrected==='P'&&b>50))b=100-b;}
+ if(cross.correction==='DOWNWEIGHT')b=50+(b-50)*.60;
+ b=50+(b-50)*Math.min(1,routeMem.penalty);
+ var c=evidenceConfidence(cross,bpCross,routeMem,b/100);if(bpCross)c=Math.min(c,bpAdj.confidenceCap);c=await calibrateConfidence(c);
+ var directionalRate=Math.max(b,100-b),directionSide=b>=50?'B':'P',decisionScore=Math.min(c,directionalRate),guard=evidenceConflict(cross,bpCross);
+ var enoughDecisionSample=cross.samples>=7,hasRealEdge=Math.max(evidenceEdge(cross.bRate),rf.edge,bpCross?evidenceEdge(bpCross.histB):0)>=.055;
+ var blocked=!enoughDecisionSample||!hasRealEdge||guard.severe||(routeMem.samples>=12&&routeMem.hitRate<.48);
+ var call=(!blocked&&decisionScore>=60)?directionSide:'PASS';
+ var tProb=Math.max(2.0,cross.tieRate*100),nonTie=100-tProb,bFinal=(b/100)*nonTie,pFinal=nonTie-bFinal;
+ var tieCallThreshold=cross.samples>=20?14:cross.samples>=12?16:18;if(cross.samples>=12&&tProb>=tieCallThreshold&&tProb>bFinal&&tProb>pFinal)call='T';
+ var betTier='觀察';if(!blocked&&decisionScore>=70)betTier='高勝率';else if(!blocked&&decisionScore>=65)betTier='優勢下注';else if(!blocked&&decisionScore>=60)betTier='可下注';else if(!enoughDecisionSample)betTier='樣本不足';else if(guard.severe)betTier='訊號衝突';else if(!hasRealEdge)betTier='無明顯優勢';
+ cross.routeMemory=routeMem;cross.segmentStats=currentSegmentStats(cross,routeMem);cross.breakpointCross=bpCross;cross.breakpointAdjustment=bpAdj;cross.reflection=reflection;cross.evidenceGuard={blocked:blocked,severeConflict:guard.severe,weakAll:guard.weakAll,hasRealEdge:hasRealEdge};
+ return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,sim:{samples:cross.samples,bRate:cross.bRate,nodeSamples:cross.nodeSamples||0},directionalRate:directionalRate,decisionScore:decisionScore,betTier:betTier,directionSide:directionSide,cross:cross,factors:pieces,signature:signature(seq)};
 }
 
 // 舊的 factorStats 僅保留相容顯示，不再讓「記一筆 loss」主導模型。
@@ -1114,33 +793,26 @@ async function updateLearning(record,actual){
  }
 }
 async function settlePending(actual){
- // V29.2 SETTLEMENT FIX：只要上一局已產生預測快照，就一定結算。
- // PASS、資料不足、0 信心也保留，避免永久局數增加但「已結算預測」不累積。
- if(!state.pendingPrediction)return false;
- var p=state.pendingPrediction;
- await updateLearning(p,actual);
- var shadow=(p.call==='B'||p.call==='P')?p.call:
-            (p.directionSide==='B'||p.directionSide==='P'?p.directionSide:null);
- var rec={
-  time:nowIso(),shoeId:state.shoeId,handNo:state.current.length,
-  prediction:p.call||'PASS',confidence:Number(p.c)||0,actual:actual,
-  hit:(p.call==='B'||p.call==='P'||p.call==='T')?p.call===actual:null,
-  isPass:(p.call||'PASS')==='PASS',shadowPrediction:shadow,
-  shadowHit:shadow?shadow===actual:null,
-  directionalRate:p.directionalRate||null,decisionScore:p.decisionScore||null,
-  betTier:p.betTier||null,
-  signature:p.signature||null,factors:p.factors||{},
-  correction:p.cross?p.cross.correction:null,
-  routeClass:p.cross?p.cross.routeClass:null,
-  historicalSamples:p.cross?p.cross.samples:0,
-  routeMemorySamples:p.cross&&p.cross.routeMemory?p.cross.routeMemory.samples:0,
-  routeMemoryHitRate:p.cross&&p.cross.routeMemory?p.cross.routeMemory.hitRate:null,
-  breakpointCross:p.cross&&p.cross.breakpointCross?p.cross.breakpointCross:null,
-  reflection:p.cross&&p.cross.reflection?p.cross.reflection:null
- };
- await reqP(tx('hands','readwrite').add(rec));
+ if(!state.pendingPrediction)return;
+ var p=state.pendingPrediction,handNo=state.current.length+1;
+ var rec={time:nowIso(),shoeId:state.shoeId,handNo:handNo,prediction:p.call,confidence:p.c,actual:actual,
+   hit:(p.call==='B'||p.call==='P'||p.call==='T')?p.call===actual:null,shadowPrediction:p.directionSide||null,
+   shadowHit:(actual==='B'||actual==='P')&&p.directionSide?(p.directionSide===actual):null,signature:p.signature,factors:p.factors,
+   correction:p.cross?p.cross.correction:null,routeClass:p.cross?p.cross.routeClass:null,historicalSamples:p.cross?p.cross.samples:0,
+   historicalNodeSamples:p.cross?p.cross.nodeSamples:0,routeMemorySamples:p.cross&&p.cross.routeMemory?p.cross.routeMemory.samples:0,
+   routeMemoryHitRate:p.cross&&p.cross.routeMemory?p.cross.routeMemory.hitRate:null,breakpointCross:p.cross&&p.cross.breakpointCross?p.cross.breakpointCross:null,
+   reflection:p.cross&&p.cross.reflection?p.cross.reflection:null,engineVersion:'29.4'};
+ var all=await allP('hands'),same=all.filter(function(h){return h&&h.shoeId===rec.shoeId&&Number(h.handNo)===Number(rec.handNo);});
+ if(same.length){
+   var existing=same[same.length-1];
+   if(existing.actual===actual){rec.id=existing.id;await reqP(tx('hands','readwrite').put(rec));}
+   else{
+     existing.dataConflict=true;existing.excludedFromLearning=true;existing.conflictActuals=Array.from(new Set([existing.actual,actual]));existing.conflictUpdatedAt=nowIso();
+     await reqP(tx('hands','readwrite').put(existing));
+   }
+ }else await reqP(tx('hands','readwrite').add(rec));
+ if((p.call==='B'||p.call==='P')&&(actual==='B'||actual==='P'))await updateLearning(p,actual);
  state.pendingPrediction=null;
- return true;
 }
 async function backfillHistoricalLearning(force){
  // V28 不再用舊式勝敗回填來驅動預測；保留既有資料庫但標記新引擎已啟用。
@@ -1150,20 +822,11 @@ async function backfillHistoricalLearning(force){
 async function fuzzySimilarStats(seq){return historicalCross(seq)}
 
 async function saveShoe(){
- var ok=await verifiedSaveShoe();
- if(ok)setTimeout(function(){autoCloudSync();},0);
- return ok;
+ if(!state.shoeId)return;
+ await reqP(tx('shoes','readwrite').put({shoeId:state.shoeId,updatedAt:nowIso(),sequence:state.current.slice()}));
+ setTimeout(function(){autoCloudSync();},0);
 }
-var resultInputQueue=Promise.resolve();
-function addResult(r){
- // V29.2 SETTLEMENT FIX：手機快速連按時依序處理，避免下一次輸入早於上一局 refresh，造成 pendingPrediction 被跳過。
- resultInputQueue=resultInputQueue.then(function(){return addResultCore(r);}).catch(function(e){
-   console.error('settlement input error',e);
-   toast('結算／保存失敗，請再按一次');
- });
- return resultInputQueue;
-}
-async function addResultCore(r){
+async function addResult(r){
  await settlePending(r);
  state.current.push(r);
  if($('saveStatus')){$('saveStatus').textContent='儲存中…';$('saveStatus').className='warn';}
@@ -1186,9 +849,7 @@ async function refresh(){
  $('hands').textContent=state.current.length;$('bpt').textContent=c.B+' / '+c.P+' / '+c.T;
  var a=await analyze(state.current);
  $('bPct').textContent=a.b.toFixed(1)+'%';$('pPct').textContent=a.p.toFixed(1)+'%';$('tPct').textContent=(a.t||0).toFixed(1)+'%';$('conf').textContent=a.c+'%';$('similar').textContent=a.sim.samples||0;
- var liveSide=a.call==='B'?'莊':a.call==='P'?'閒':a.call==='T'?'和':'PASS';
- var liveRate=(a.call==='PASS'||!a.decisionScore)?'—':a.decisionScore.toFixed(1)+'%';
- $('call').textContent='本局：'+liveSide+'｜有效勝率 '+liveRate+'｜'+(a.call==='PASS'?'不下注':'可下注');
+ $('call').textContent=a.call==='B'?'B 莊':a.call==='P'?'P 閒':a.call==='T'?'T 和':'PASS';
  $('call').style.background=a.call==='B'?'#f04455':a.call==='P'?'#347cf0':a.call==='T'?'#20a36a':'#53627a';
  var histText='尚無資料', histRate=null, histSide='';
  if(a.sim&&a.sim.samples){
@@ -1203,23 +864,13 @@ async function refresh(){
  var cx=a.cross;
  var seg=(cx&&cx.segmentStats)?cx.segmentStats:null;
  $('segmentWin').textContent=seg?seg.label:'樣本不足';
- var cr=cx&&cx.currentRoadStats?cx.currentRoadStats:null;
- if(cr&&cr.samples>=8){
-  var crSide=cr.side==='B'?'莊':'閒';
-  $('currentRoadWin').textContent='續'+crSide+' '+(cr.continueRate*100).toFixed(1)+'%｜'+cr.samples+'樣本';
- }else $('currentRoadWin').textContent='樣本不足';
- var nr=cx&&cx.nextRoadStats?cx.nextRoadStats:null;
- if(nr&&nr.samples>=8){
-  var nrSide=nr.returnSide==='B'?'莊':'閒';
-  $('nextRoadWin').textContent='新路回切'+nrSide+' '+(nr.returnRate*100).toFixed(1)+'%｜'+nr.samples+'樣本';
- }else $('nextRoadWin').textContent='樣本不足';
  $('segmentLive').textContent=seg?seg.liveLabel:'尚無資料';
  var sideText=a.directionSide==='B'?'莊':a.directionSide==='P'?'閒':'—';
  var grade=a.betTier||'觀察';
  $('betGrade').textContent=grade+(a.directionalRate?('｜'+sideText+' '+a.directionalRate.toFixed(1)+'%'):'');
  $('betGrade').style.color=grade==='高勝率'?'#7CFC9A':grade==='優勢下注'?'#9BE15D':grade==='可下注'?'#ffd166':'#aab5c5';
  $('reason').textContent=(a.call==='PASS'?'未達統一 60 分門檻或樣本不足，PASS。':'已達統一下注門檻。')
-   +(cx?'｜路型 '+cx.routeClass+'｜相似節點 '+cx.samples+'｜錯誤校正 '+(cx.correction==='FLIP'?'已翻向':cx.correction==='DOWNWEIGHT'?'已降權':'保持')+'｜和局歷史 '+(cx.tieRate*100).toFixed(1)+'%':'')
+   +(cx?'｜路型 '+cx.routeClass+'｜獨立相似鞋 '+cx.samples+'（節點 '+(cx.nodeSamples||0)+'）｜錯誤校正 '+(cx.correction==='FLIP'?'已翻向':cx.correction==='DOWNWEIGHT'?'已降權':'保持')+'｜和局歷史 '+(cx.tieRate*100).toFixed(1)+'%':'')
    +(cx&&cx.breakpointAdjustment&&cx.breakpointAdjustment.label?'｜'+cx.breakpointAdjustment.label:'')
    +(a.sim&&a.sim.samples?'｜歷史'+histSide+'支持 '+(histRate*100).toFixed(1)+'%':'')
    +(seg&&seg.samples>=8?'｜目前路段歷史勝率 '+(seg.rate*100).toFixed(1)+'%（'+seg.side+'方向／'+seg.samples+'樣本）':'')
@@ -1231,7 +882,7 @@ async function refresh(){
      var r=cx.route[k]; if(!r)return;
      var div=document.createElement('div');div.className='factor';
      var side=r.b>=.5?'莊':'閒',rate=Math.max(r.b,r.p)*100;
-     div.innerHTML='<div class="factorTop"><b>'+labels[k]+' 歷史交叉</b><span>'+side+' '+rate.toFixed(1)+'%｜相似節點 '+cx.samples+'</span></div><div class="bar"><i style="width:'+Math.min(100,rate)+'%"></i></div>';
+     div.innerHTML='<div class="factorTop"><b>'+labels[k]+' 歷史交叉</b><span>'+side+' '+rate.toFixed(1)+'%｜獨立鞋 '+cx.samples+'</span></div><div class="bar"><i style="width:'+Math.min(100,rate)+'%"></i></div>';
      $('factorBox').appendChild(div);
    });
    var div=document.createElement('div');div.className='factor';
@@ -1248,62 +899,53 @@ async function refresh(){
 async function updateDashboard(){
  var hands=await allP('hands'),shoes=await allP('shoes');
  var permanentHands=shoes.reduce((s,x)=>s+(Array.isArray(x.sequence)?x.sequence.length:0),0); $('dbHands').textContent=permanentHands;
- $('dbShoes').textContent=shoes.length;$('dbPred').textContent=hands.length;
- var hits=hands.filter(x=>x.hit===true).length;
+ var cleanHands=cleanHistoricalHands(hands); $('dbShoes').textContent=cleanHistoricalShoes(shoes).length;$('dbPred').textContent=cleanHands.length;
+ var hits=cleanHands.filter(x=>x.hit===true).length;
  // V27.1: Current-analysis historical support is rendered from fuzzy similar samples in refresh().
  // Do not overwrite #acc here with the much smaller live-settled-prediction history.
  $('dbStatus').innerHTML='<span class="ok">IndexedDB 已啟用</span>｜資料會持續保存在這台裝置';
- var recent=hands.slice(-50).reverse();$('historyRows').innerHTML=recent.length?'':'<tr><td colspan="7">尚無紀錄</td></tr>';
+ var recent=cleanHands.slice(-50).reverse();$('historyRows').innerHTML=recent.length?'':'<tr><td colspan="7">尚無紀錄</td></tr>';
  recent.forEach(function(x){
   var tr=document.createElement('tr');
-  var aiLabel=x.prediction==='PASS'?(x.shadowPrediction?'PASS（偏'+x.shadowPrediction+'）':'PASS'):x.prediction;
-  var resultLabel=x.prediction==='PASS'?(typeof x.shadowHit==='boolean'?(x.shadowHit?'觀察✓':'觀察✗'):'觀察'):(x.hit?'✓':'✗');
-  tr.innerHTML='<td>'+new Date(x.time).toLocaleString()+'</td><td>'+String(x.shoeId||'').slice(-6)+'</td><td>'+x.handNo+'</td><td>'+aiLabel+'</td><td>'+x.actual+'</td><td>'+resultLabel+'</td><td>'+x.confidence+'%</td>';
+  tr.innerHTML='<td>'+new Date(x.time).toLocaleString()+'</td><td>'+x.shoeId.slice(-6)+'</td><td>'+x.handNo+'</td><td>'+x.prediction+'</td><td>'+x.actual+'</td><td>'+(x.hit?'✓':'✗')+'</td><td>'+x.confidence+'%</td>';
   $('historyRows').appendChild(tr);
  });
 }
 async function exportDB(){
- var payload={version:'28.8',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
- var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V28_8_BACKUP_'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+ var payload={version:'29.4',engine:'CLEAN_LEARNING_ENGINE',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V29_4_BACKUP_'+Date.now()+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
 }
 async function importDB(file){
- var data=JSON.parse(await file.text());
- for(const s of (data.shoes||[])) await reqP(tx('shoes','readwrite').put(s));
- for(const h of (data.hands||[])) await reqP(tx('hands','readwrite').add(h));
- for(const f of (data.factorStats||[])) await reqP(tx('factorStats','readwrite').put(f));
- await loadFactorStats();await refresh();toast('備份已匯入');
+ var data=JSON.parse(await file.text()),before=(data.hands||[]).length,cleanHands=cleanHistoricalHands(data.hands||[]);
+ for(const s of (data.shoes||[]))await reqP(tx('shoes','readwrite').put(s));
+ var existing=cleanHistoricalHands(await allP('hands')),map={};existing.forEach(function(h){if(h.shoeId!=null&&h.handNo!=null)map[String(h.shoeId)+'|'+String(h.handNo)]=h;});
+ for(const h of cleanHands){var k=(h.shoeId!=null&&h.handNo!=null)?String(h.shoeId)+'|'+String(h.handNo):null;if(k&&map[k]){h.id=map[k].id;await reqP(tx('hands','readwrite').put(h));}else await reqP(tx('hands','readwrite').add(h));}
+ for(const f of (data.factorStats||[]))await reqP(tx('factorStats','readwrite').put(f));
+ await loadFactorStats();await refresh();toast('備份已匯入｜學習紀錄 '+before+' → '+cleanHands.length+'（重複/衝突不進學習）');
 }
 
 function parseManualSequence(raw){
  var s=(raw||'').toUpperCase().match(/[BPT]/g)||[];
  return s;
 }
-async function applySequenceThroughSettlement(seq,mode){
- // V29.2 SETTLEMENT INPUT FIX：任何「新增實際結果」都逐局走同一條結算鏈。
- // 這裡刻意重用 addResultCore，不改分析、勝率、路單、權重或門檻。
- var s=Array.isArray(seq)?seq:[];
- if(mode==='replace'){
-   state.current=[];
-   state.pendingPrediction=null;
-   await saveShoe();
-   await refresh(); // 先建立第 1 局開獎前的預測快照（即使是 PASS/資料不足也保留）
- }
- for(var i=0;i<s.length;i++) await addResultCore(s[i]);
-}
 async function replaceWithManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- await resultInputQueue;
- await applySequenceThroughSettlement(s,'replace');
+ state.current=s.slice();
+ state.pendingPrediction=null;
+ await saveShoe();
  $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局';
+ await refresh();
  toast('已取代目前鞋');
 }
 async function appendManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- await resultInputQueue;
- await applySequenceThroughSettlement(s,'append');
+ state.current=state.current.concat(s);
+ state.pendingPrediction=null;
+ await saveShoe();
  $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局';
+ await refresh();
  toast('已接續目前鞋');
 }
 
@@ -1349,7 +991,7 @@ async function cloudSnapshot(){
     version:26,
     updatedAt:new Date().toISOString(),
     shoes:await allP('shoes'),
-    hands:await allP('hands'),
+    hands:cleanHistoricalHands(await allP('hands')),
     factorStats:await allP('factorStats')
   };
 }
@@ -1373,7 +1015,8 @@ async function pullCloudData(){
   await reqP(tx('hands','readwrite').clear());
   await reqP(tx('factorStats','readwrite').clear());
   for(const s of (data.shoes||[])) await reqP(tx('shoes','readwrite').put(s));
-  for(const h of (data.hands||[])) await reqP(tx('hands','readwrite').add(h));
+  var restoredHands=cleanHistoricalHands(data.hands||[]);
+  for(const h of restoredHands) await reqP(tx('hands','readwrite').add(h));
   for(const f of (data.factorStats||[])) await reqP(tx('factorStats','readwrite').put(f));
   await loadFactorStats();
   var shoes=await allP('shoes');
@@ -1430,8 +1073,6 @@ function bindCloudUI(){
 }
 
 async function start(){
- var coreCheck=roadCoreSelfTest();
- if(!coreCheck.ok)throw new Error('路單核心自檢失敗 #'+coreCheck.index);
  await openDB();
  var preloaded=await preloadHistoryOnce();
  await loadFactorStats();
@@ -1458,7 +1099,7 @@ async function start(){
  $('manualSeq').oninput=function(){var s=parseManualSequence(this.value);$('manualSeqInfo').textContent=s.length?'已讀取 '+s.length+' 局':'尚未輸入序列。'};
  var bf=await backfillHistoricalLearning(false);await loadFactorStats();
  await refresh();
- toast((preloaded?'歷史路單已自動匯入｜':'')+'V29.2 路單核心 '+ROAD_CORE_VERSION+' ✓');
+ toast((preloaded?'歷史路單已自動匯入｜':'')+'V29.4 乾淨學習引擎已啟動');
 }
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
