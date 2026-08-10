@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081426">
-<title>AI PRO V29.4 CLEAN LEARNING ENGINE</title>
+<title>AI PRO V29.5 LEARNING PIPELINE FIX</title>
 <style>
 :root{--bg:#071322;--panel:#0e1d31;--line:#2a4161;--text:#f4f7fb;--muted:#9eb0c8;--red:#f04455;--blue:#347cf0;--green:#20be63;--gold:#e7b548;--gray:#53627a}
 *{box-sizing:border-box}
@@ -37,10 +37,10 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 <main class="wrap">
 <header class="hero">
   <div>
-    <h1>AI PRO V29.4 CLEAN LEARNING ENGINE</h1>
+    <h1>AI PRO V29.5 LEARNING PIPELINE FIX</h1>
     <p class="muted">手動輸入優先・永久資料庫・相似局面交叉比對・自適應權重</p>
   </div>
-  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.4 CLEAN LEARNING ENGINE</div></div>
+  <div><div class="badge">已啟動</div><div class="badge" style="margin-top:6px">BUILD V29.5 LEARNING PIPELINE FIX</div></div>
 </header>
 
 <section class="panel">
@@ -55,7 +55,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
   </div>
-  <p class="muted">V28.1 已內建 V27.6 歷史路單，首次開啟會自動匯入並接續最後一鞋；莊／閒／和三方機率由相似路型、正反路、下三路、歷史錯誤修正與樣本量動態決定；信心度會用實際命中紀錄再校準。歷史資料不再只累積勝敗。系統先把珠盤路轉成大路與下三路，再以路型、正反鏡像、柱高、單跳/雙跳/長龍/三顆斷/四顆斷等結構搜尋歷史相似節點；錯誤會直接改變同型路的下一次方向權重。T 和局獨立統計。</p>
+  <p class="muted">V29.5 延續既有永久歷史資料；手動整串輸入也會逐局建立預測快照並在結果進入時結算；莊／閒／和三方機率由相似路型、正反路、下三路、歷史錯誤修正與樣本量動態決定；信心度會用實際命中紀錄再校準。歷史資料不再只累積勝敗。系統先把珠盤路轉成大路與下三路，再以路型、正反鏡像、柱高、單跳/雙跳/長龍/三顆斷/四顆斷等結構搜尋歷史相似節點；錯誤會直接改變同型路的下一次方向權重。T 和局獨立統計。</p>
 </section>
 
 <section class="panel">
@@ -103,7 +103,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <div class="card"><span class="muted">累積總局數</span><b id="dbHands">0</b></div>
     <div class="card"><span class="muted">累積鞋數</span><b id="dbShoes">0</b></div>
     <div class="card"><span class="muted">已結算建議</span><b id="dbPred">0</b></div>
-    <div class="card"><span class="muted">模型版本</span><b>V29.4 CLEAN</b></div>
+    <div class="card"><span class="muted">模型版本</span><b>V29.5 PIPELINE</b></div>
     <div class="card"><span class="muted">保存狀態</span><b id="saveStatus">等待操作</b></div>
   </div>
   <p id="dbStatus" class="muted">正在開啟 IndexedDB…</p>
@@ -796,22 +796,30 @@ async function settlePending(actual){
  if(!state.pendingPrediction)return;
  var p=state.pendingPrediction,handNo=state.current.length+1;
  var rec={time:nowIso(),shoeId:state.shoeId,handNo:handNo,prediction:p.call,confidence:p.c,actual:actual,
-   hit:(p.call==='B'||p.call==='P'||p.call==='T')?p.call===actual:null,shadowPrediction:p.directionSide||null,
-   shadowHit:(actual==='B'||actual==='P')&&p.directionSide?(p.directionSide===actual):null,signature:p.signature,factors:p.factors,
+   hit:(p.call==='B'||p.call==='P'||p.call==='T')?p.call===actual:null,isPass:p.call==='PASS',shadowPrediction:p.directionSide||null,
+   shadowHit:(actual==='B'||actual==='P')&&p.directionSide?(p.directionSide===actual):null,directionalRate:p.directionalRate||50,
+   decisionScore:p.decisionScore||0,betTier:p.betTier||'觀察',signature:p.signature||null,factors:p.factors||[],
    correction:p.cross?p.cross.correction:null,routeClass:p.cross?p.cross.routeClass:null,historicalSamples:p.cross?p.cross.samples:0,
    historicalNodeSamples:p.cross?p.cross.nodeSamples:0,routeMemorySamples:p.cross&&p.cross.routeMemory?p.cross.routeMemory.samples:0,
    routeMemoryHitRate:p.cross&&p.cross.routeMemory?p.cross.routeMemory.hitRate:null,breakpointCross:p.cross&&p.cross.breakpointCross?p.cross.breakpointCross:null,
-   reflection:p.cross&&p.cross.reflection?p.cross.reflection:null,engineVersion:'29.4'};
+   reflection:p.cross&&p.cross.reflection?p.cross.reflection:null,engineVersion:'29.5'};
  var all=await allP('hands'),same=all.filter(function(h){return h&&h.shoeId===rec.shoeId&&Number(h.handNo)===Number(rec.handNo);});
+ var newlySettled=false;
  if(same.length){
    var existing=same[same.length-1];
-   if(existing.actual===actual){rec.id=existing.id;await reqP(tx('hands','readwrite').put(rec));}
-   else{
+   if(existing.actual===actual){
+     // 同鞋同局已結算：只更新快照，不重複灌入學習統計。
+     rec.id=existing.id;await reqP(tx('hands','readwrite').put(rec));
+   }else{
+     // 同一局出現不同實際結果：標記衝突並排除，避免錯標籤污染學習。
      existing.dataConflict=true;existing.excludedFromLearning=true;existing.conflictActuals=Array.from(new Set([existing.actual,actual]));existing.conflictUpdatedAt=nowIso();
      await reqP(tx('hands','readwrite').put(existing));
    }
- }else await reqP(tx('hands','readwrite').add(rec));
- if((p.call==='B'||p.call==='P')&&(actual==='B'||actual==='P'))await updateLearning(p,actual);
+ }else{
+   await reqP(tx('hands','readwrite').add(rec));
+   newlySettled=true;
+ }
+ if(newlySettled&&(p.call==='B'||p.call==='P')&&(actual==='B'||actual==='P'))await updateLearning(p,actual);
  state.pendingPrediction=null;
 }
 async function backfillHistoricalLearning(force){
@@ -912,8 +920,8 @@ async function updateDashboard(){
  });
 }
 async function exportDB(){
- var payload={version:'29.4',engine:'CLEAN_LEARNING_ENGINE',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
- var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V29_4_BACKUP_'+Date.now()+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+ var payload={version:'29.5',engine:'LEARNING_PIPELINE_FIX',exportedAt:nowIso(),shoes:await allP('shoes'),hands:await allP('hands'),factorStats:await allP('factorStats')};
+ var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_PRO_V29_5_BACKUP_'+Date.now()+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
 }
 async function importDB(file){
  var data=JSON.parse(await file.text()),before=(data.hands||[]).length,cleanHands=cleanHistoricalHands(data.hands||[]);
@@ -928,25 +936,45 @@ function parseManualSequence(raw){
  var s=(raw||'').toUpperCase().match(/[BPT]/g)||[];
  return s;
 }
+async function deleteHandsForShoe(shoeId){
+ var rows=await allP('hands');
+ for(const h of rows){if(h&&h.shoeId===shoeId&&h.id!=null)await reqP(tx('hands','readwrite').delete(h.id));}
+}
+async function processManualResults(results){
+ // 關鍵修正：整串輸入也必須逐局產生「當時預測」再用下一個實際結果結算，不能直接 concat sequence。
+ for(const r of results){
+   if(!state.pendingPrediction)state.pendingPrediction=await analyze(state.current);
+   await settlePending(r);
+   state.current.push(r);
+   var ok=await verifiedSaveShoe();
+   if(!ok)throw new Error('手動序列第 '+state.current.length+' 局保存失敗');
+   state.pendingPrediction=await analyze(state.current);
+ }
+}
 async function replaceWithManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- state.current=s.slice();
- state.pendingPrediction=null;
- await saveShoe();
- $('manualSeqInfo').textContent='已取代目前鞋：'+s.length+' 局';
- await refresh();
- toast('已取代目前鞋');
+ try{
+   // 取代目前鞋時，同鞋舊逐局紀錄一起清掉，避免 shoeId+handNo 與新序列混在一起。
+   await deleteHandsForShoe(state.shoeId);
+   state.current=[];state.pendingPrediction=await analyze(state.current);await verifiedSaveShoe();
+   await processManualResults(s);
+   $('manualSeqInfo').textContent='已逐局取代目前鞋：'+s.length+' 局｜學習鏈已結算';
+   await refresh();
+   toast('已取代目前鞋｜逐局學習已寫入');
+ }catch(e){$('manualSeqInfo').textContent='寫入失敗：'+e.message;await refresh();toast('手動序列寫入失敗');}
 }
 async function appendManualSequence(){
  var s=parseManualSequence($('manualSeq').value);
  if(!s.length){$('manualSeqInfo').textContent='沒有有效的 B/P/T';return toast('沒有有效序列');}
- state.current=state.current.concat(s);
- state.pendingPrediction=null;
- await saveShoe();
- $('manualSeqInfo').textContent='已接續 '+s.length+' 局，目前共 '+state.current.length+' 局';
- await refresh();
- toast('已接續目前鞋');
+ try{
+   // 接續時沿用目前畫面上的 pendingPrediction，之後每一局都重新分析、再結算。
+   if(!state.pendingPrediction)state.pendingPrediction=await analyze(state.current);
+   await processManualResults(s);
+   $('manualSeqInfo').textContent='已逐局接續 '+s.length+' 局，目前共 '+state.current.length+' 局｜學習鏈已結算';
+   await refresh();
+   toast('已接續目前鞋｜逐局學習已寫入');
+ }catch(e){$('manualSeqInfo').textContent='寫入失敗：'+e.message;await refresh();toast('手動序列寫入失敗');}
 }
 
 
@@ -1099,7 +1127,7 @@ async function start(){
  $('manualSeq').oninput=function(){var s=parseManualSequence(this.value);$('manualSeqInfo').textContent=s.length?'已讀取 '+s.length+' 局':'尚未輸入序列。'};
  var bf=await backfillHistoricalLearning(false);await loadFactorStats();
  await refresh();
- toast((preloaded?'歷史路單已自動匯入｜':'')+'V29.4 乾淨學習引擎已啟動');
+ toast((preloaded?'歷史路單已自動匯入｜':'')+'V29.5 學習寫入鏈已啟動');
 }
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
