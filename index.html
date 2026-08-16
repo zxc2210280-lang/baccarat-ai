@@ -32,7 +32,53 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 .small{font-size:12px}.ok{color:var(--green)}.warn{color:#ffd166}
 @media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}.cards{grid-template-columns:repeat(4,1fr)}}
 </style>
-<style>#tPct{visibility:hidden!important}</style></head>
+
+
+
+
+<style id="practical-ui-lock">
+#practicalAnalysisGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.practical-rate-card{
+  min-width:0;
+  text-align:center;
+  padding:18px 10px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#091a2d;
+}
+.practical-rate-card b{
+  display:block;
+  font-size:clamp(34px,9vw,56px);
+  line-height:1.05;
+  white-space:nowrap;
+}
+.practical-rate-card span{display:block;margin-top:8px}
+#historyHighHitZone{
+  display:none;
+  width:max-content;
+  max-width:100%;
+  margin:16px auto 0;
+  padding:9px 18px;
+  border-radius:12px;
+  background:#d23b3b;
+  color:#fff;
+  font-size:20px;
+  font-weight:900;
+}
+#legacyAnalysisSink{display:none!important}
+@media(max-width:720px){
+  body{overflow-x:hidden}
+  #practicalAnalysisGrid{gap:10px}
+  .practical-rate-card{padding:16px 8px}
+  input,textarea{max-width:100%;box-sizing:border-box}
+  button{min-height:44px}
+}
+</style>
+</head>
 <body>
 <main class="wrap">
 <header class="hero">
@@ -50,7 +96,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
     <button class="p" data-r="P">P 閒</button>
     <button class="t" data-r="T">T 和</button>
     <button id="undo">復原</button>
-    <button id="newShoe">封存／新鞋</button>
+    <button id="newShoe">清牌鞋</button>
     <button id="replay">逐局回放</button>
     <button id="exportBtn">匯出 JSON</button>
     <label class="fileBtn">匯入 JSON<input id="importInput" type="file" accept="application/json"></label>
@@ -70,32 +116,23 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
   <p id="manualSeqInfo" class="muted">尚未輸入序列。</p>
 </section>
 
-<section class="panel">
+
+<section class="panel" id="practicalAnalysisPanel">
   <h2>目前分析</h2>
-  <div class="stats">
-    <div><b id="bPct">45.0%</b><span class="muted">莊機率</span></div>
-    <div><b id="pPct">45.0%</b><span class="muted">閒機率</span></div>
-    <div><b id="tPct">10.0%</b><span class="muted">和機率</span></div>
-    <div><b id="conf">0%</b><span class="muted">模型信心（訊號一致度）</span></div>
+  <div id="practicalAnalysisGrid">
+    <div class="practical-rate-card">
+      <b id="bPct">50.0%</b>
+      <span class="muted">莊勝率</span>
+    </div>
+    <div class="practical-rate-card">
+      <b id="pPct">50.0%</b>
+      <span class="muted">閒勝率</span>
+    </div>
   </div>
-  <div id="call" class="call">PASS</div>
-  <div class="cards" style="margin-top:12px">
-    <div class="card"><span class="muted">目前局數</span><b id="hands">0</b></div>
-    <div class="card"><span class="muted">莊／閒／和</span><b id="bpt">0 / 0 / 0</b></div>
-    <div class="card"><span class="muted">相似樣本</span><b id="similar">0</b></div>
-    <div class="card"><span class="muted">相似局歷史支持</span><b id="acc">尚無資料</b></div>
-    <div class="card"><span class="muted">目前路段勝率</span><b id="segmentWin">樣本不足</b></div>
-    <div class="card"><span class="muted">同路型實戰命中</span><b id="segmentLive">尚無資料</b></div>
-    <div class="card"><span class="muted">下注判定</span><b id="betGrade">觀察</b></div>
-  </div>
-  <p id="reason" class="muted"></p>
+  <div id="historyHighHitZone">高命中區</div>
 </section>
 
-<section class="panel">
-  <h2>自適應學習權重</h2>
-  <div id="factorBox"></div>
-  <p class="muted small">權重由永久歷史表現更新。樣本不足時會回到保守權重，避免短期資料把模型帶偏。</p>
-</section>
+
 
 <section class="panel">
   <h2>永久資料庫</h2>
@@ -151,6 +188,7 @@ input[type="text"],textarea{width:100%;background:#071525;border:1px solid var(-
 </main>
 <div id="toast" class="toast"></div>
 
+<script src="all_history_scan.js"></script>
 <script>
 (function(){
 'use strict';
@@ -827,19 +865,34 @@ async function calibrateConfidence(rawC){
  return Math.max(50,Math.min(88,Math.round(c)));
 }
 
-var LOCKED_SCAN_META={"shoes":54,"rounds":2753,"decision_points":2236,"groups":{"L1":90,"L2":74,"L3":16,"L4":14}};var LOCKED_SCAN_INDEX={"L1":{"短路|形成|1|3-3-1-2-1-1-1|BBPBP":[3,2,2,1,0.6667],"單跳|形成|1|1-2-1-1-1-1-1|PBPBP":[9,5,6,3,0.6667],"單跳|形成|1|2-1-1-1-1-1-1|BPBPB":[9,5,2,7,0.2222],"混合短路|形成|1|1-1-1-1-1-3-1|PBBBP":[4,3,1,3,0.25],"混合短路|確認|2|1-1-1-1-1-3-2|BBBPP":[3,2,3,0,1.0],"混合短路|形成|1|1-1-1-1-3-2-1|BBPPB":[4,3,2,2,0.5],"短路|形成|1|1-1-3-2-2-1-1|PBBPB":[3,2,0,3,0.0],"短路|形成|1|1-3-2-2-1-1-1|BBPBP":[4,3,1,3,0.25],"短路|確認|2|1-3-2-2-1-1-2|BPBPP":[3,2,3,0,1.0],"短路|形成|1|3-2-2-1-1-2-1|PBPPB":[3,2,2,1,0.6667],"混合短路|形成|1|1-3-1-1-3-1-1|PPPBP":[4,4,2,2,0.5],"短路|形成|1|1-2-1-1-2-1-1|BPPBP":[4,4,2,2,0.5],"短路|形成|1|1-1-2-1-1-1-1|PBPBP":[3,3,1,2,0.3333],"單跳|形成|1|2-1-1-1-1-1-1|PBPBP":[3,3,2,1,0.6667],"混合短路|確認|2|0-0-0-0-2-2-2|PBBPP":[3,3,2,1,0.6667],"短路|形成|1|1-2-2-1-2-1-1|PBBPB":[3,3,1,2,0.3333],"二一路|形成|1|2-2-1-2-1-2-1|BPBBP":[3,3,3,0,1.0],"短路|形成|1|2-1-2-1-2-1-1|PBBPB":[3,3,2,1,0.6667],"短路|確認|2|1-2-1-1-1-1-2|BPBPP":[3,3,2,1,0.6667],"短路|形成|1|2-1-1-1-1-2-1|PBPPB":[6,3,1,5,0.1667],"短路|形成|1|1-1-1-1-2-1-1|BPPBP":[8,5,6,2,0.75],"短路|形成|1|1-1-1-2-1-1-1|PPBPB":[8,4,8,0,1.0],"短路|確認|2|1-1-1-2-1-1-2|PBPBB":[8,4,3,5,0.375],"短路|形成|1|1-1-2-1-1-2-1|BPBBP":[6,3,5,1,0.8333],"短路|形成|1|1-2-1-1-2-1-1|PBBPB":[6,3,1,5,0.1667],"短路|形成|1|2-1-1-2-1-1-1|BBPBP":[5,2,4,1,0.8],"短路|形成|1|1-1-2-1-1-1-1|BPBPB":[7,4,1,6,0.1429],"單跳|形成|1|1-1-1-1-1-1-1|PBPBP":[13,9,4,9,0.3077],"單跳|形成|1|1-1-1-1-1-1-1|BPBPB":[8,6,5,3,0.625],"短路|確認|2|1-1-1-1-1-1-2|PBPBB":[5,4,1,4,0.2],"短路|形成|1|1-1-1-1-1-2-1|BPBBP":[4,3,1,3,0.25],"短路|確認|2|1-1-1-1-1-2-2|PBBPP":[3,2,0,3,0.0],"混合短路|延續|3|1-1-1-1-1-2-3|BBPPP":[3,2,0,3,0.0],"正路|延續|4|1-1-1-1-1-2-4|BPPPP":[3,2,0,3,0.0],"長龍|成熟|5|1-1-1-1-1-2-5|PPPPP":[3,2,2,1,0.6667],"正路|形成|1|1-1-1-2-5-3-1|PBBBP":[3,2,0,3,0.0],"正路|確認|2|1-1-1-2-5-3-2|BBBPP":[3,2,2,1,0.6667],"短路|形成|1|1-1-1-1-2-1-1|PBBPB":[4,3,1,3,0.25],"短路|形成|1|1-1-1-2-1-1-1|BBPBP":[4,3,1,3,0.25],"短路|確認|2|1-1-1-2-1-1-2|BPBPP":[3,2,0,3,0.0],"混合短路|延續|3|1-1-1-2-1-1-3|PBPPP":[3,2,0,3,0.0],"正路|延續|4|1-1-1-2-1-1-4|BPPPP":[3,2,0,3,0.0],"長龍|成熟|5|1-1-1-2-1-1-5|PPPPP":[3,2,2,1,0.6667],"短路|確認|2|1-1-1-1-1-1-2|BPBPP":[9,9,3,6,0.3333],"混合短路|延續|3|1-1-1-1-1-1-3|PBPPP":[5,5,1,4,0.2],"混合短路|形成|1|1-1-3-1-1-3-1|BPPPB":[4,4,1,3,0.25],"短路|形成|1|0-0-1-1-2-1-1|BPPBP":[3,3,3,0,1.0],"短路|形成|1|0-1-1-2-1-1-1|PPBPB":[3,3,2,1,0.6667],"混合短路|確認|2|0-0-0-0-3-1-2|PPBPP":[4,4,1,3,0.25],"混合短路|延續|3|0-0-0-0-3-1-3|PBPPP":[3,3,1,2,0.3333],"混合短路|形成|1|2-1-2-4-1-2-1|PBPPB":[4,4,0,4,0.0],"短路|形成|1|1-2-4-1-2-1-1|BPPBP":[4,4,1,3,0.25],"二一路|確認|2|1-2-4-1-2-1-2|PPBPP":[3,3,2,1,0.6667],"短路|形成|1|1-1-1-1-1-2-1|PBPPB":[3,3,1,2,0.3333],"混合短路|確認|2|0-0-0-0-1-2-2|PBBPP":[3,3,1,2,0.3333],"混合短路|延續|3|0-0-0-0-1-2-3|BBPPP":[3,3,0,3,0.0],"正路|延續|4|0-0-0-0-1-2-4|BPPPP":[3,3,1,2,0.3333],"短路|形成|1|1-2-5-1-1-1-1|PBPBP":[4,4,1,3,0.25],"短路|確認|2|1-2-5-1-1-1-2|BPBPP":[3,3,2,1,0.6667],"短路|形成|1|2-5-1-1-1-2-1|PBPPB":[3,3,3,0,1.0],"短路|確認|2|2-5-1-1-1-2-2|BPPBB":[3,3,0,3,0.0],"短路|形成|1|5-1-1-1-2-2-1|PPBBP":[3,3,2,1,0.6667],"短路|形成|1|1-1-2-1-2-2-1|BBPPB":[3,3,2,1,0.6667],"混合短路|形成|1|1-1-2-5-1-1-1|PPBPB":[3,3,0,3,0.0],"混合短路|形成|1|1-1-1-3-1-1-1|BBPBP":[3,3,0,3,0.0],"混合短路|確認|2|1-1-1-3-1-1-2|BPBPP":[3,3,0,3,0.0],"混合短路|延續|3|1-1-1-3-1-1-3|PBPPP":[3,3,3,0,1.0],"單跳|形成|1|0-1-1-1-1-1-1|BPBPB":[3,3,1,2,0.3333],"混合短路|延續|3|1-1-1-2-1-1-3|BPBBB":[3,2,3,0,1.0],"正路|延續|4|1-1-1-2-1-1-4|PBBBB":[3,2,3,0,1.0],"長龍|成熟|5|1-1-1-2-1-1-5|BBBBB":[3,2,1,2,0.3333],"混合短路|形成|1|1-3-1-3-2-1-1|BPPBP":[3,3,0,3,0.0],"混合短路|確認|2|1-3-1-3-2-1-2|PPBPP":[3,3,2,1,0.6667],"正路|形成|1|0-0-0-0-0-5-1|BBBBP":[3,3,0,3,0.0],"正路|確認|2|0-0-0-0-0-5-2|BBBPP":[3,3,2,1,0.6667],"短路|形成|1|1-3-1-2-1-1-1|PPBPB":[8,2,0,8,0.0],"短路|形成|1|3-1-2-1-1-1-1|PBPBP":[9,3,0,9,0.0],"短路|確認|2|3-1-2-1-1-1-2|BPBPP":[9,3,0,9,0.0],"混合短路|延續|3|3-1-2-1-1-1-3|PBPPP":[9,3,1,8,0.1111],"正路|延續|4|3-1-2-1-1-1-4|BPPPP":[8,2,0,8,0.0],"二一路|形成|1|1-1-1-2-1-2-1|PBPPB":[3,3,1,2,0.3333],"短路|形成|1|1-1-2-1-2-1-1|BPPBP":[3,3,2,1,0.6667],"短路|形成|1|1-2-1-2-1-1-1|PPBPB":[3,3,2,1,0.6667],"正路|延續|4|1-1-1-1-1-1-4|BPPPP":[4,4,0,4,0.0],"長龍|成熟|5|1-1-1-1-1-1-5|PPPPP":[3,3,3,0,1.0],"正路|形成|1|1-1-1-1-1-5-1|PPPPB":[3,3,1,2,0.3333],"混合短路|形成|1|1-1-1-3-2-1-1|BPPBP":[3,3,2,1,0.6667],"單跳|形成|1|1-3-1-1-1-1-1|PBPBP":[3,3,0,3,0.0],"短路|確認|2|1-3-1-1-1-1-2|BPBPP":[3,3,1,2,0.3333],"短路|形成|1|2-1-2-1-1-2-1|BPBBP":[3,2,1,2,0.3333]},"L2":{"正路|確認|2|PPPBB":[38,25,25,13,0.6579],"正路|延續|3|PPBBB":[27,21,11,16,0.4074],"混合短路|形成|1|PBBBP":[49,27,29,20,0.5918],"混合短路|形成|1|BBBPB":[37,27,19,18,0.5135],"混合短路|確認|2|BBPBB":[24,18,11,13,0.4583],"混合短路|形成|1|BPBBP":[17,15,11,6,0.6471],"短路|形成|1|PBBPB":[59,29,31,28,0.5254],"短路|形成|1|BBPBP":[38,20,22,16,0.5789],"短路|形成|1|BPBPB":[32,20,11,21,0.3438],"單跳|形成|1|PBPBP":[42,22,21,21,0.5],"單跳|形成|1|BPBPB":[32,18,13,19,0.4062],"短路|確認|2|PBPBB":[59,33,31,28,0.5254],"混合短路|延續|3|BPBBB":[60,30,29,31,0.4833],"混合短路|確認|2|BBBPP":[20,15,15,5,0.75],"混合短路|形成|1|BBPPB":[21,18,11,10,0.5238],"混合短路|確認|2|BPPBB":[18,15,8,10,0.4444],"混合短路|形成|1|PPBBP":[27,19,15,12,0.5556],"短路|確認|2|BPBPP":[66,31,29,37,0.4394],"短路|形成|1|PBPPB":[35,23,9,26,0.2571],"短路|確認|2|BPPBB":[28,24,11,17,0.3929],"短路|形成|1|PPBBP":[25,18,12,13,0.48],"短路|確認|2|PBBPP":[32,26,15,17,0.4688],"混合短路|延續|3|BBPPP":[35,25,10,25,0.2857],"正路|延續|4|BPPPP":[78,34,22,56,0.2821],"正路|形成|1|PPPPB":[74,32,31,43,0.4189],"正路|形成|1|PPPBP":[44,23,26,18,0.5909],"混合短路|形成|1|PPBPB":[38,23,14,24,0.3684],"混合短路|確認|2|PBPBB":[14,12,9,5,0.6429],"混合短路|形成|1|BPPPB":[47,28,19,28,0.4043],"混合短路|確認|2|PPPBB":[17,14,7,10,0.4118],"混合短路|延續|3|PPBBB":[27,20,15,12,0.5556],"混合短路|形成|1|PBBPB":[15,12,6,9,0.4],"短路|確認|2|BBPBB":[10,9,4,6,0.4],"混合短路|形成|1|BBPBP":[21,17,10,11,0.4762],"混合短路|確認|2|BPBPP":[11,11,5,6,0.4545],"混合短路|延續|3|PBPPP":[65,33,29,36,0.4462],"混合短路|形成|1|PPPBP":[35,21,12,23,0.3429],"正路|延續|4|PBBBB":[66,33,41,25,0.6212],"長龍|成熟|5|BBBBB":[39,24,13,26,0.3333],"正路|形成|1|BBBBP":[69,34,25,44,0.3623],"正路|形成|1|BBBPB":[25,20,20,5,0.8],"正路|確認|2|BBPBB":[19,15,11,8,0.5789],"短路|形成|1|BPPBP":[65,31,44,21,0.6769],"短路|形成|1|PPBPB":[51,28,34,17,0.6667],"短路|形成|1|PBPBP":[42,22,12,30,0.2857],"混合短路|確認|2|PBBPP":[21,16,11,10,0.5238],"短路|形成|1|BBPPB":[24,18,14,10,0.5833],"短路|確認|2|PPBPP":[6,6,2,4,0.3333],"二一路|形成|1|PBPPB":[18,15,11,7,0.6111],"二一路|形成|1|BPBBP":[21,16,11,10,0.5238],"二一路|確認|2|BBPBB":[20,15,8,12,0.4],"正路|確認|2|BBBPP":[50,26,21,29,0.42],"正路|形成|1|BBPPB":[18,13,9,9,0.5],"正路|確認|2|BPPBB":[9,7,5,4,0.5556],"混合短路|確認|2|PPBPP":[36,21,23,13,0.6389],"長龍|成熟|5|PPPPP":[52,25,30,22,0.5769],"正路|形成|1|PPBBP":[10,7,7,3,0.7],"短路|形成|1|BPBBP":[33,19,18,15,0.5455],"正路|形成|1|PBBBP":[12,11,7,5,0.5833],"正路|延續|3|BBPPP":[32,19,15,17,0.4688],"混合短路|形成|1|BPPBP":[17,14,8,9,0.4706],"長龍|成熟|6|BBBBB":[14,11,7,7,0.5],"長龍|長龍後段|7|BBBBB":[7,6,1,6,0.1429],"正路|形成|1|BPPPB":[12,9,6,6,0.5],"混合短路|形成|1|PBPPB":[27,14,6,21,0.2222],"正路|延續|3|BPBBB":[11,9,8,3,0.7273],"長龍|成熟|6|PPPPP":[22,10,17,5,0.7727],"正路|確認|2|PPBPP":[17,11,11,6,0.6471],"二一路|確認|2|PPBPP":[15,12,9,6,0.6],"正路|延續|3|PBPPP":[6,6,4,2,0.6667],"長龍|長龍後段|7|PPPPP":[5,4,4,1,0.8],"雙跳|確認|2|BPPBB":[6,5,1,5,0.1667],"正路|確認|2|PBBPP":[3,3,1,2,0.3333],"雙跳|確認|2|PBBPP":[5,4,2,3,0.4]},"L3":{"正路|確認|2":[138,40,75,63,0.5435],"正路|延續|3":[77,32,39,38,0.5065],"混合短路|形成|1":[353,51,160,193,0.4533],"混合短路|確認|2":[162,49,90,72,0.5556],"短路|形成|1":[405,52,207,198,0.5111],"單跳|形成|1":[74,23,34,40,0.4595],"短路|確認|2":[201,49,92,109,0.4577],"混合短路|延續|3":[187,52,83,104,0.4439],"正路|延續|4":[145,48,63,82,0.4345],"正路|形成|1":[266,46,132,134,0.4962],"長龍|成熟|5":[91,39,43,48,0.4725],"二一路|形成|1":[39,26,22,17,0.5641],"二一路|確認|2":[35,24,17,18,0.4857],"長龍|成熟|6":[36,20,24,12,0.6667],"長龍|長龍後段|7":[12,10,5,7,0.4167],"雙跳|確認|2":[11,6,3,8,0.2727]},"L4":{"正路|確認":[138,40,75,63,0.5435],"正路|延續":[222,49,102,120,0.4595],"混合短路|形成":[353,51,160,193,0.4533],"混合短路|確認":[162,49,90,72,0.5556],"短路|形成":[405,52,207,198,0.5111],"單跳|形成":[74,23,34,40,0.4595],"短路|確認":[201,49,92,109,0.4577],"混合短路|延續":[187,52,83,104,0.4439],"正路|形成":[266,46,132,134,0.4962],"長龍|成熟":[127,39,67,60,0.5276],"二一路|形成":[39,26,22,17,0.5641],"二一路|確認":[35,24,17,18,0.4857],"長龍|長龍後段":[16,10,7,9,0.4375],"雙跳|確認":[11,6,3,8,0.2727]}};
-function lockedHistoryAdvice(seq){
- var rr=runsOf(seq),lens=rr.map(function(x){return x.len}),last=rr.length?rr[rr.length-1]:{len:0},p=lens.slice(-7);while(p.length<7)p.unshift(0);
- function rt(){var a=lens.slice(-6);if(!a.length)return'未知';if(a[a.length-1]>=5)return'長龍';if(a.length>=5&&a.slice(-5).every(function(x){return x===1}))return'單跳';if(a.length>=4&&a.slice(-4).every(function(x){return x===2}))return'雙跳';if(a.length>=4&&a.slice(-4).every(function(x){return x===1||x===2})){var z=a.slice(-4).join('');return(z==='2121'||z==='1212')?'二一路':'短路'}if(a.length>=3&&Math.max.apply(null,a.slice(-3))<=3)return'混合短路';return'正路'}
- var life=last.len<=1?'形成':last.len===2?'確認':last.len<=4?'延續':last.len<=6?'成熟':'長龍後段',r=rt(),t=tailPattern(seq,5);
- var ks=[['L1',[r,life,last.len,p.join('-'),t].join('|')],['L2',[r,life,last.len,t].join('|')],['L3',[r,life,last.len].join('|')],['L4',[r,life].join('|')]],best=null;
- for(var i=0;i<ks.length;i++){var z=LOCKED_SCAN_INDEX[ks[i][0]][ks[i][1]];if(!z)continue;var x={level:ks[i][0],samples:z[0],shoes:z[1],B:z[2],P:z[3],bRate:z[4]};if(x.samples>=5&&x.shoes>=3){best=x;break}if(!best)best=x}
- if(!best){var b=seq.filter(function(x){return x==='B'}).length,pn=seq.filter(function(x){return x==='P'}).length;return{side:b>=pn?'B':'P',strength:'弱',samples:0,shoes:0,bRate:.5}}
- best.side=best.bRate>=.5?'B':'P';var e=Math.abs(best.bRate-.5);best.strength=(best.samples>=12&&best.shoes>=5&&e>=.10)?'強':(best.samples>=7&&best.shoes>=3&&e>=.05)?'中':'弱';return best;
+
+function allHistoryWinRate(seq){
+ var hx=window.AI_PRO_ALL_HISTORY_SCAN;
+ if(!hx||!hx.roadTrendIndex)return{side:'B',winRate:50,samples:0,shoes:0,level:'NONE',strength:'弱'};
+ var rr=runsOf(seq),lens=rr.map(function(x){return x.len}),last=rr.length?rr[rr.length-1]:{side:'?',len:0},cols=lens.slice(-7);while(cols.length<7)cols.unshift(0);
+ function route(){var a=lens.slice(-7);if(!a.length)return'未知';if(a[a.length-1]>=5)return'長龍';if(a.length>=5&&a.slice(-5).every(function(x){return x===1}))return'單跳';if(a.length>=4&&a.slice(-4).every(function(x){return x===2}))return'雙跳';var z=a.length>=4?a.slice(-4).join(''):'';if(z==='2121'||z==='1212')return'二一路';if(a.length>=4&&a.slice(-4).every(function(x){return x===1||x===2}))return'短路';if(a.length>=3&&Math.max.apply(null,a.slice(-3))<=3)return'混合短路';return'正路';}
+ function dr(off){var s='';for(var i=off+1;i<lens.length;i++){var a=lens[i],b=lens[i-off],c=i-off-1>=0?lens[i-off-1]:b;s+=((a>=b)===(b>=c))?'R':'B';}return s;}
+ var life=last.len<=1?'形成':last.len===2?'確認':last.len<=4?'延續':last.len<=6?'成熟':'長龍後段';
+ var r=route(),bp=seq.filter(function(x){return x==='B'||x==='P'}).join(''),t5=bp.slice(-5),e=dr(1),s=dr(2),c=dr(3),tails=[e.slice(-4),s.slice(-4),c.slice(-4)],align='分歧/未形成';
+ if(tails[0]&&tails[1]&&tails[2]&&tails[0].slice(-1)===tails[1].slice(-1)&&tails[1].slice(-1)===tails[2].slice(-1))align='全對齊';else if(tails.filter(Boolean).length>=2)align='二對一';
+ var keys=[
+ ['L1',[r,life,last.len,cols.join('-'),t5,e.slice(-5),s.slice(-5),c.slice(-5),align].join('|')],
+ ['L2',[r,life,last.len,t5,e.slice(-3),s.slice(-3),c.slice(-3),align].join('|')],
+ ['L3',[r,life,last.len,t5,align].join('|')],
+ ['L4',[r,life,last.len,align].join('|')],
+ ['L5',[r,life,align].join('|')]];
+ var best=null;
+ for(var i=0;i<keys.length;i++){var row=hx.roadTrendIndex[keys[i][0]]&&hx.roadTrendIndex[keys[i][0]][keys[i][1]];if(!row)continue;best={level:keys[i][0],n:row.n,shoes:row.shoes,B:row.B,P:row.P,bRate:row.bRate,sameRate:row.sameRate,switchRate:row.switchRate};if(row.n>=5&&row.shoes>=2)break;}
+ if(!best){var bc=seq.filter(function(x){return x==='B'}).length,pc=seq.filter(function(x){return x==='P'}).length;return{side:bc>=pc?'B':'P',winRate:50,samples:0,shoes:0,level:'NONE',strength:'弱'};}
+ var side=best.bRate>=.5?'B':'P',raw=Math.max(best.bRate,1-best.bRate),n=best.n;
+ // Beta(4,4) calibration only; output remains a win-rate, never PASS.
+ var calibrated=(raw*n+4)/(n+8),strength=(n>=15&&best.shoes>=5&&calibrated>=.62)?'強':(n>=8&&best.shoes>=3&&calibrated>=.57)?'中':'弱';
+ return{side:side,winRate:calibrated*100,rawRate:raw*100,samples:n,shoes:best.shoes,level:best.level,strength:strength,bRate:best.bRate,sameRate:best.sameRate,switchRate:best.switchRate};
 }
+
 async function analyze(seq){
- if(seq.filter(function(x){return x!=='T';}).length<6){var ea=lockedHistoryAdvice(seq);return{b:47,p:47,t:6,c:0,call:ea.side,sim:{samples:ea.samples||0},directionalRate:50,decisionScore:0,betTier:'弱建議',directionSide:ea.side,cross:null,factors:{}};}
- var cross=await historicalCross(seq),lockedAdvice=lockedHistoryAdvice(seq),route=cross.route||{},routeMem=await routeCorrectionMemory(cross.routeClass);
+ if(seq.filter(function(x){return x!=='T';}).length<6){var ah0=allHistoryWinRate(seq);return{b:ah0.side==='B'?ah0.winRate:100-ah0.winRate,p:ah0.side==='P'?ah0.winRate:100-ah0.winRate,t:0,c:Math.round(ah0.winRate),call:ah0.side,sim:{samples:ah0.samples},directionalRate:ah0.winRate,decisionScore:ah0.winRate,betTier:ah0.strength+'建議',directionSide:ah0.side,cross:{allHistory:ah0},factors:{}};}
+ var cross=await historicalCross(seq),allHist=allHistoryWinRate(seq),route=cross.route||{},routeMem=await routeCorrectionMemory(cross.routeClass);
  var bpCross=await breakpointCross(seq),bpAdj=breakpointAdjustment(bpCross),reflection=independentReflection(cross,bpCross,routeMem),pieces=[],num=0,den=0;
  // 四條路屬於同一資料家族，先合併再投票，避免 4 個相關弱訊號被算成 4 張獨立票。
  var rf=roadFamily(route);if(rf.count){var rw=.65+Math.min(.20,rf.edge);num+=rf.b*rw;den+=rw;pieces.push({id:'roadFamily',name:'大路＋下三路家族',w:rw,v:(rf.b-.5)*2,impact:rw*(rf.b-.5)*2,rate:rf.b});}
@@ -856,12 +909,12 @@ async function analyze(seq){
  var directionalRate=Math.max(b,100-b),directionSide=b>=50?'B':'P',decisionScore=Math.min(c,directionalRate),guard=evidenceConflict(cross,bpCross);
  var enoughDecisionSample=cross.samples>=7,hasRealEdge=Math.max(evidenceEdge(cross.bRate),rf.edge,bpCross?evidenceEdge(bpCross.histB):0)>=.055;
  var blocked=!enoughDecisionSample||!hasRealEdge||guard.severe||(routeMem.samples>=12&&routeMem.hitRate<.48)||(errorMem&&errorMem.action==='PASS_GUARD');
- var call=directionSide||lockedAdvice.side;
+ var call=allHist.side;
  var tProb=Math.max(2.0,cross.tieRate*100),nonTie=100-tProb,bFinal=(b/100)*nonTie,pFinal=nonTie-bFinal;
- var tieCallThreshold=cross.samples>=20?14:cross.samples>=12?16:18;/* T保留資料，不取代B/P建議 */
+ var tieCallThreshold=cross.samples>=20?14:cross.samples>=12?16:18;/* 最終只輸出B/P歷史勝率 */
  var betTier='觀察';if(!blocked&&decisionScore>=70)betTier='高勝率';else if(!blocked&&decisionScore>=65)betTier='優勢下注';else if(!blocked&&decisionScore>=60)betTier='可下注';else if(!enoughDecisionSample)betTier='樣本不足';else if(guard.severe)betTier='訊號衝突';else if(!hasRealEdge)betTier='無明顯優勢';
  cross.routeMemory=routeMem;cross.errorMemory=errorMem;cross.segmentStats=currentSegmentStats(cross,routeMem);cross.breakpointCross=bpCross;cross.breakpointAdjustment=bpAdj;cross.reflection=reflection;cross.reflection.errorMemory=errorMem;cross.evidenceGuard={blocked:blocked,severeConflict:guard.severe,weakAll:guard.weakAll,hasRealEdge:hasRealEdge};
- return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,sim:{samples:cross.samples,bRate:cross.bRate,nodeSamples:cross.nodeSamples||0},directionalRate:directionalRate,decisionScore:decisionScore,betTier:betTier,directionSide:directionSide,cross:cross,factors:pieces,signature:signature(seq)};
+ cross.allHistory=allHist;var hb=allHist.side==='B'?allHist.winRate:100-allHist.winRate,hp=100-hb;return{b:hb,p:hp,t:0,c:Math.round(allHist.winRate),call:allHist.side,sim:{samples:allHist.samples,bRate:allHist.bRate||.5,nodeSamples:cross.nodeSamples||0},directionalRate:allHist.winRate,decisionScore:allHist.winRate,betTier:allHist.strength+'建議｜'+allHist.level+'｜'+allHist.samples+'點/'+allHist.shoes+'鞋',directionSide:allHist.side,cross:cross,factors:pieces,signature:signature(seq)};
 }
 
 // 舊的 factorStats 僅保留相容顯示，不再讓「記一筆 loss」主導模型。
@@ -1275,6 +1328,27 @@ async function start(){
  toast((preloaded?'歷史路單已自動匯入｜':'')+'V29.6.1 已回放 '+(replayMemory?replayMemory.totalOutcomes:0)+' 局歷史｜錯誤記憶已啟動');
 }
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
+})();
+</script>
+
+
+
+<div id="legacyAnalysisSink" aria-hidden="true"><span id="acc"></span><span id="betGrade"></span><span id="bpt"></span><span id="call"></span><span id="conf"></span><span id="factorBox"></span><span id="hands"></span><span id="reason"></span><span id="segmentLive"></span><span id="segmentWin"></span><span id="similar"></span><span id="tPct"></span></div>
+
+<script id="practical-display-hook">
+(function(){
+  function updateHighHitZone(){
+    var b=document.getElementById('bPct'),p=document.getElementById('pPct'),z=document.getElementById('historyHighHitZone');
+    if(!b||!p||!z)return;
+    var bv=parseFloat(b.textContent)||0,pv=parseFloat(p.textContent)||0;
+    z.style.display=Math.max(bv,pv)>=66?'block':'none';
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    updateHighHitZone();
+    var ob=new MutationObserver(updateHighHitZone),b=document.getElementById('bPct'),p=document.getElementById('pPct');
+    if(b)ob.observe(b,{childList:true,subtree:true,characterData:true});
+    if(p)ob.observe(p,{childList:true,subtree:true,characterData:true});
+  });
 })();
 </script>
 </body>
