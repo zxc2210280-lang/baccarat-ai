@@ -838,13 +838,14 @@ function v63HistoricalScan(seq){
  var life=last.len<=1?'形成':last.len===2?'確認':last.len<=4?'延續':last.len<=6?'成熟':'長龍後段',t=tailPattern(seq,5),route=cls();
  var ks=[['L1',[route,life,last.len,p.join('-'),t].join('|')],['L2',[route,life,last.len,t].join('|')],['L3',[route,life,last.len].join('|')],['L4',[route,life].join('|')]],best=null;
  for(var i=0;i<ks.length;i++){var r=V63_SCAN_INDEX[ks[i][0]][ks[i][1]];if(!r)continue;var x={level:ks[i][0],samples:r[0],shoes:r[1],B:r[2],P:r[3],bRate:r[4]};if(x.samples>=5&&x.shoes>=3){best=x;break}if(!best)best=x}
- if(!best)return{samples:0,shoes:0,bRate:.5,side:'—',pass:true,label:'歷史掃描樣本不足'};
- best.side=best.bRate>=.5?'B':'P';best.pass=best.samples<5||best.shoes<3||Math.abs(best.bRate-.5)<.015;
- best.label=(best.pass?'PASS':'歷史方向 '+best.side)+'｜'+best.level+'｜'+best.samples+'點/'+best.shoes+'鞋｜B '+(best.bRate*100).toFixed(1)+'% / P '+((1-best.bRate)*100).toFixed(1)+'%';return best;
+ if(!best)return{samples:0,shoes:0,bRate:.5,side:'B',pass:false,strength:'弱',label:'弱建議 B｜歷史掃描樣本不足'};
+ best.side=best.bRate>=.5?'B':'P';best.pass=false;
+ var edge=Math.abs(best.bRate-.5),strength=(best.samples>=12&&best.shoes>=5&&edge>=.10)?'強':(best.samples>=7&&best.shoes>=3&&edge>=.05)?'中':'弱';
+ best.strength=strength;best.label=strength+'建議 '+best.side+'｜'+best.level+'｜'+best.samples+'點/'+best.shoes+'鞋｜B '+(best.bRate*100).toFixed(1)+'% / P '+((1-best.bRate)*100).toFixed(1)+'%';return best;
 }
 
 async function analyze(seq){
- if(seq.filter(function(x){return x!=='T';}).length<6)return{b:47,p:47,t:6,c:0,call:'PASS',sim:{samples:0},directionalRate:50,decisionScore:0,betTier:'觀察',directionSide:null,cross:null,factors:{}};
+ if(seq.filter(function(x){return x!=='T';}).length<6){var nb=seq.filter(function(x){return x==='B';}).length,np=seq.filter(function(x){return x==='P';}).length,early=nb>=np?'B':'P';return{b:47,p:47,t:6,c:0,call:early,sim:{samples:0},directionalRate:50,decisionScore:0,betTier:'弱建議',directionSide:early,cross:null,factors:{}};}
  var cross=await historicalCross(seq),route=cross.route||{},routeMem=await routeCorrectionMemory(cross.routeClass);
  var v63scan=v63HistoricalScan(seq);
 
@@ -865,10 +866,10 @@ async function analyze(seq){
  var directionalRate=Math.max(b,100-b),directionSide=b>=50?'B':'P',decisionScore=Math.min(c,directionalRate),guard=evidenceConflict(cross,bpCross);
  var enoughDecisionSample=cross.samples>=7,hasRealEdge=Math.max(evidenceEdge(cross.bRate),rf.edge,bpCross?evidenceEdge(bpCross.histB):0)>=.055;
  var blocked=!enoughDecisionSample||!hasRealEdge||guard.severe||(routeMem.samples>=12&&routeMem.hitRate<.48)||(errorMem&&errorMem.action==='PASS_GUARD');
- var call=(!blocked&&decisionScore>=60)?directionSide:'PASS';
+ var call=directionSide||(v63scan&&v63scan.side?v63scan.side:(b>=50?'B':'P'));
  var tProb=Math.max(2.0,cross.tieRate*100),nonTie=100-tProb,bFinal=(b/100)*nonTie,pFinal=nonTie-bFinal;
- var tieCallThreshold=cross.samples>=20?14:cross.samples>=12?16:18;if(cross.samples>=12&&tProb>=tieCallThreshold&&tProb>bFinal&&tProb>pFinal)call='T';
- var betTier='觀察';if(!blocked&&decisionScore>=70)betTier='高勝率';else if(!blocked&&decisionScore>=65)betTier='優勢下注';else if(!blocked&&decisionScore>=60)betTier='可下注';else if(!enoughDecisionSample)betTier='樣本不足';else if(guard.severe)betTier='訊號衝突';else if(!hasRealEdge)betTier='無明顯優勢';
+ var tieCallThreshold=cross.samples>=20?14:cross.samples>=12?16:18;/* 和局保留統計，不作最終B/P建議 */
+ var betTier='觀察';if(!blocked&&decisionScore>=70)betTier='高勝率';else if(!blocked&&decisionScore>=65)betTier='優勢下注';else if(!blocked&&decisionScore>=60)betTier='可下注';else if(!enoughDecisionSample)betTier='弱建議';else if(guard.severe)betTier='弱建議';else if(!hasRealEdge)betTier='弱建議';
  cross.routeMemory=routeMem;cross.errorMemory=errorMem;cross.segmentStats=currentSegmentStats(cross,routeMem);cross.breakpointCross=bpCross;cross.breakpointAdjustment=bpAdj;cross.reflection=reflection;cross.reflection.errorMemory=errorMem;cross.evidenceGuard={blocked:blocked,severeConflict:guard.severe,weakAll:guard.weakAll,hasRealEdge:hasRealEdge};
  return{b:bFinal,p:pFinal,t:tProb,c:c,call:call,sim:{samples:cross.samples,bRate:cross.bRate,nodeSamples:cross.nodeSamples||0},directionalRate:directionalRate,decisionScore:decisionScore,betTier:betTier,directionSide:directionSide,cross:cross,factors:pieces,signature:signature(seq)};
 }
@@ -1286,5 +1287,10 @@ async function start(){
 start().catch(e=>{$('dbStatus').textContent='資料庫啟動失敗：'+e.message});
 })();
 </script>
-</body>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+ var e=document.getElementById('tPct');
+ if(e&&e.parentElement)e.parentElement.style.display='none';
+});
+</script></body>
 </html>
